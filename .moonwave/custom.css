@@ -1,0 +1,73 @@
+/* Force a dark theme by default */
+
+:root {
+  --ifm-color-primary: #a371f7;
+  --ifm-color-primary-dark: #8e5af5;
+  --ifm-color-primary-darker: #7c4be3;
+  --ifm-color-primary-darkest: #5e2db8;
+  --ifm-color-primary-light: #bc94ff;
+  --ifm-color-primary-lighter: #cdb2ff;
+  --ifm-color-primary-lightest: #efe6ff;
+
+  --ifm-background-color: #0d1117;
+  --ifm-background-surface-color: #161b22;
+  --ifm-font-color-base: #c9d1d9;
+  --ifm-font-color-secondary: #8b949e;
+  --ifm-navbar-background-color: #161b22;
+  --ifm-navbar-link-color: #c9d1d9;
+  --ifm-footer-background-color: #161b22;
+  --ifm-footer-color: #8b949e;
+  --ifm-link-color: #a371f7;
+  --ifm-link-hover-color: #bc94ff;
+  --ifm-menu-color: #c9d1d9;
+  --ifm-menu-color-background-active: #21262d;
+  --ifm-menu-color-background-hover: #21262d;
+  --ifm-code-background: #21262d;
+  --ifm-pre-background: #161b22;
+  --ifm-table-stripe-background: #161b22;
+  --ifm-hr-background-color: #30363d;
+  --ifm-color-emphasis-0: #f0f6fc;
+  --ifm-color-emphasis-100: #c9d1d9;
+  --ifm-color-emphasis-200: #b1bac4;
+  --ifm-color-emphasis-300: #8b949e;
+  --ifm-color-emphasis-400: #6e7681;
+  --ifm-color-emphasis-500: #484f58;
+  --ifm-color-emphasis-600: #30363d;
+  --ifm-color-emphasis-700: #21262d;
+  --ifm-color-emphasis-800: #161b22;
+  --ifm-color-emphasis-900: #0d1117;
+  --ifm-color-emphasis-1000: #010409;
+
+  --ifm-heading-color: #f0f6fc;
+  --ifm-toc-link-color: #c9d1d9;
+  --ifm-breadcrumb-color-active: #a371f7;
+
+  --docusaurus-highlighted-code-line-bg: rgba(163, 113, 247, 0.15);
+}
+
+body {
+  background-color: var(--ifm-background-color);
+  color: var(--ifm-font-color-base);
+}
+
+.navbar {
+  background-color: var(--ifm-navbar-background-color);
+  border-bottom: 1px solid var(--ifm-color-emphasis-700);
+}
+
+.footer {
+  background-color: var(--ifm-footer-background-color);
+}
+
+.menu {
+  background-color: var(--ifm-background-surface-color);
+}
+
+pre,
+code {
+  background-color: var(--ifm-code-background);
+}
+
+.theme-doc-markdown {
+  color: var(--ifm-font-color-base);
+}
