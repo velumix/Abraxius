@@ -1,6 +1,6 @@
 # API Reference
 
-Roblox MCP Node exposes three main layers: the WebSocket bridge, the HTTP client, and the sync helpers.
+Abraxius exposes three main layers: the WebSocket bridge, the HTTP client, and the sync helpers.
 
 ## `RobloxMCPBridge`
 

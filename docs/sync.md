@@ -1,6 +1,6 @@
 # Sync Workflow
 
-Roblox MCP Node can extract scripts from Studio into a local project and push your edits back. The layout uses standard Roblox Luau file extensions so scripts map cleanly between your filesystem and the Studio datamodel.
+Abraxius can extract scripts from Studio into a local project and push your edits back. The layout uses standard Roblox Luau file extensions so scripts map cleanly between your filesystem and the Studio datamodel.
 
 ## Pull
 
@@ -54,7 +54,7 @@ my-game/
 ```json
 {
   "name": "my-game",
-  "format": "roblox-mcp-node-v1",
+  "format": "abraxius-v1",
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": { "$path": "src/ReplicatedStorage" },
@@ -76,8 +76,8 @@ This resolves the local file back to `game.ServerScriptService.MatchManager`, re
 ## Programmatic sync
 
 ```js
-const { MCPClient } = require("roblox-mcp-node");
-const { Puller } = require("roblox-mcp-node/lib/pull");
+const { MCPClient } = require("abraxius");
+const { Puller } = require("abraxius/lib/pull");
 
 const client = new MCPClient();
 const puller = new Puller(client, {

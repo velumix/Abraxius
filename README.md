@@ -1,8 +1,8 @@
-# Roblox MCP Node
+# Abraxius
 
 Background MCP bridge + CLI for Roblox Studio with a local-to-Studio script sync workflow.
 
-Roblox Studio exposes MCP over a WebSocket on `ws://localhost:13469/studio`. This project runs a background bridge on that socket and exposes a local HTTP API on `localhost:13470` so you can query, edit, and pull scripts from Studio.
+Abraxius runs a background bridge to Roblox Studio's MCP WebSocket (`ws://localhost:13469/studio`) and exposes a local HTTP API on `localhost:13470` so you can query, edit, and pull scripts from Studio.
 
 ## Install
 
@@ -99,7 +99,7 @@ File extension conventions:
 ```json
 {
   "name": "my-game",
-  "format": "roblox-mcp-node-v1",
+  "format": "abraxius-v1",
   "tree": {
     "$className": "DataModel",
     "ReplicatedStorage": { "$path": "src/ReplicatedStorage" },

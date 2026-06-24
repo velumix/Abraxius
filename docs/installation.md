@@ -3,8 +3,8 @@
 ## Clone and install
 
 ```bash
-git clone https://github.com/your-username/roblox-mcp-node.git
-cd roblox-mcp-node
+git clone https://github.com/your-username/abraxius.git
+cd abraxius
 npm install
 ```
 

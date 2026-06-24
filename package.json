@@ -1,7 +1,7 @@
 {
-  "name": "roblox-mcp-node",
+  "name": "abraxius",
   "version": "1.0.0",
-  "description": "Background MCP bridge and local-to-Studio script sync for Roblox Studio",
+  "description": "Abraxius — background MCP bridge and local-to-Studio script sync for Roblox Studio",
   "main": "client.js",
   "bin": {
     "mcp": "./cli.js"

@@ -57,7 +57,7 @@ function ensureDaemon() {
   if (isRunning()) return;
   console.log("Starting MCP daemon...");
   const log = fs.openSync(
-    path.join(require("os").tmpdir(), "roblox-mcp-node.log"),
+    path.join(require("os").tmpdir(), "abraxius.log"),
     "a",
   );
   const proc = spawn(
@@ -145,10 +145,7 @@ async function main() {
       }
 
       case "logs": {
-        const logPath = path.join(
-          require("os").tmpdir(),
-          "roblox-mcp-node.log",
-        );
+        const logPath = path.join(require("os").tmpdir(), "abraxius.log");
         if (!fs.existsSync(logPath)) {
           console.log("No log file yet");
           return;

@@ -6,8 +6,8 @@ const os = require("os");
 const { RobloxMCPBridge } = require("./bridge");
 
 const API_PORT = 13470;
-const PID_FILE = path.join(os.tmpdir(), "roblox-mcp-node.pid");
-const LOG_FILE = path.join(os.tmpdir(), "roblox-mcp-node.log");
+const PID_FILE = path.join(os.tmpdir(), "abraxius.pid");
+const LOG_FILE = path.join(os.tmpdir(), "abraxius.log");
 
 function sendJson(res, statusCode, obj) {
   res.writeHead(statusCode, { "Content-Type": "application/json" });
@@ -34,7 +34,11 @@ async function createServer(bridge) {
     try {
       const url = new URL(req.url, `http://localhost:${API_PORT}`);
       const route = `${req.method} ${url.pathname}`;
-      if (bridge.ready && url.pathname !== "/health" && url.pathname !== "/log") {
+      if (
+        bridge.ready &&
+        url.pathname !== "/health" &&
+        url.pathname !== "/log"
+      ) {
         bridge.logToStudio(`[Abraxius] HTTP ${route}`);
       }
 

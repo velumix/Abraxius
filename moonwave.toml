@@ -1,15 +1,15 @@
-title = "Roblox MCP Node"
-description = "Background MCP bridge and local-to-Studio script sync for Roblox Studio"
+title = "Abraxius"
+description = "Abraxius — background MCP bridge and local-to-Studio script sync for Roblox Studio"
 
 [docusaurus]
-title = "Roblox MCP Node"
-tagline = "Background MCP bridge and local-to-Studio script sync for Roblox Studio"
+title = "Abraxius"
+tagline = "Abraxius — background MCP bridge and local-to-Studio script sync for Roblox Studio"
 baseUrl = "/"
 organizationName = ""
-projectName = "roblox-mcp-node"
+projectName = "abraxius"
 
 [navbar]
-title = "Roblox MCP Node"
+title = "Abraxius"
 
 [home]
 enabled = true
