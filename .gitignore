@@ -4,3 +4,4 @@ node_modules/
 build/
 .moonwave/Cache/
 .moonwave/*.log
+.kimi/
