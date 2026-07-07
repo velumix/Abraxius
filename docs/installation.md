@@ -41,7 +41,15 @@ The companion plugin gives Abraxius real-time visibility into Studio state and m
 npm run install-plugin
 ```
 
+This installs one local plugin script:
+
+```text
+Roblox/Plugins/AbraxiusCompanion.lua
+```
+
 Then restart Roblox Studio. You should see an **Abraxius** toolbar with a **Companion** button.
+
+Do not install the source folder as `AbraxiusCompanion/init.server.luau`; `init` files have Rojo-style folder semantics, and the local Studio plugin should be a single script file.
 
 The plugin needs **HTTP Requests** enabled:
 

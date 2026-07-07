@@ -15,10 +15,10 @@ This plugin lives in Roblox Studio and talks to the Abraxius daemon on a second 
 
 ### Windows
 
-Copy the `AbraxiusCompanion` folder into your Roblox Studio local plugins folder:
+Copy the plugin script into your Roblox Studio local plugins folder:
 
 ```powershell
-xcopy /E /I "C:\Users\TheRe\Desktop\Abraxius\plugin\AbraxiusCompanion" "%LOCALAPPDATA%\Roblox\Plugins\AbraxiusCompanion"
+Copy-Item "C:\Users\TheRe\Desktop\Abraxius\plugin\AbraxiusCompanion\init.server.luau" "$env:LOCALAPPDATA\Roblox\Plugins\AbraxiusCompanion.lua" -Force
 ```
 
 Or from this directory run:
@@ -30,10 +30,13 @@ npm run install-plugin
 ### macOS
 
 ```bash
-cp -R plugin/AbraxiusCompanion ~/Documents/Roblox/Plugins/AbraxiusCompanion
+mkdir -p ~/Documents/Roblox/Plugins
+cp plugin/AbraxiusCompanion/init.server.luau ~/Documents/Roblox/Plugins/AbraxiusCompanion.lua
 ```
 
 Then restart Roblox Studio. You should see an **Abraxius** toolbar with a **Companion** button.
+
+The plugin is intentionally installed as one `.lua` file. Do not install it as an `AbraxiusCompanion/init.server.luau` folder tree, because `init` files have Rojo-style folder semantics.
 
 ## Requirements
 
