@@ -1,7 +1,7 @@
 {
   "name": "abraxius",
   "version": "1.0.0",
-  "description": "Abraxius — background MCP bridge and local-to-Studio script sync for Roblox Studio",
+  "description": "AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio",
   "main": "client.js",
   "bin": {
     "mcp": "./cli.js"
@@ -12,7 +12,10 @@
     "status": "node server.js status",
     "example": "node examples/basic.js",
     "docs:dev": "moonwave dev --code .moonwave/stub",
-    "docs:build": "moonwave build --fresh --code .moonwave/stub"
+    "docs:build": "moonwave build --fresh --code .moonwave/stub",
+    "smoke": "node scripts/smoke.js",
+    "install-plugin": "node scripts/install-plugin.js",
+    "plugin": "node scripts/install-plugin.js"
   },
   "keywords": [
     "roblox",
@@ -21,7 +24,9 @@
     "websocket",
     "cli",
     "sync",
-    "luau"
+    "luau",
+    "ai-context",
+    "roblox-studio"
   ],
   "author": "",
   "license": "MIT",

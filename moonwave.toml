@@ -1,9 +1,9 @@
 title = "Abraxius"
-description = "Abraxius — background MCP bridge and local-to-Studio script sync for Roblox Studio"
+description = "Abraxius - AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio"
 
 [docusaurus]
 title = "Abraxius"
-tagline = "Abraxius — background MCP bridge and local-to-Studio script sync for Roblox Studio"
+tagline = "AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio"
 baseUrl = "/Abraxius/"
 organizationName = "velumix"
 projectName = "abraxius"
@@ -17,12 +17,16 @@ includeReadme = true
 
 [[home.features]]
 title = "Background Bridge"
-description = "Keep a persistent WebSocket bridge to Roblox Studio running in the background so your tools are always one command away."
+description = "Keep a persistent MCP WebSocket bridge to Roblox Studio running in the background with a local HTTP API for tools and agents."
 
 [[home.features]]
-title = "MCP Tool Proxy"
-description = "Call any Roblox Studio MCP tool, read studio state, and execute Luau directly from JavaScript or the CLI."
+title = "AI Context Memory"
+description = "Give AI sessions one clear briefing with pinned project memory, recent operations, pending pushes, and Studio companion events."
+
+[[home.features]]
+title = "Studio Companion"
+description = "Track selection, source changes, play mode, and Draft Mode verification through the Abraxius Studio Companion plugin."
 
 [[home.features]]
 title = "Script Sync"
-description = "Pull scripts from Studio into a local project and push edits back with multi_edit, using familiar .server.luau and .client.luau conventions."
+description = "Pull scripts from Studio into a local project and push edits back with multi_edit using familiar Luau file conventions."

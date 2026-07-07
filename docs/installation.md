@@ -3,8 +3,8 @@
 ## Clone and install
 
 ```bash
-git clone https://github.com/your-username/abraxius.git
-cd abraxius
+git clone https://github.com/velumix/Abraxius.git
+cd Abraxius
 npm install
 ```
 
@@ -32,3 +32,31 @@ mcp pull ./my-game
 4. Restart Studio if prompted.
 
 Once enabled, Studio will attempt to connect to `ws://localhost:13469/studio` whenever a place is open.
+
+## (Optional but recommended) Install the Studio Companion Plugin
+
+The companion plugin gives Abraxius real-time visibility into Studio state and makes Draft Mode pushes trackable.
+
+```bash
+npm run install-plugin
+```
+
+Then restart Roblox Studio. You should see an **Abraxius** toolbar with a **Companion** button.
+
+The plugin needs **HTTP Requests** enabled:
+
+1. Open **Game Settings**.
+2. Go to **Security**.
+3. Enable **Allow HTTP Requests**.
+
+The plugin connects to `http://localhost:13471`.
+
+## Verify the installation
+
+```bash
+npm run smoke
+mcp status
+mcp ai-context
+```
+
+`mcp ai-context` works even when the daemon is not connected to Studio, because pinned memory is stored locally in `.abraxius/memory.json`.

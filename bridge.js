@@ -2,24 +2,7 @@ const { EventEmitter } = require("events");
 const WebSocket = require("ws");
 const http = require("http");
 
-/**
- * A pure-Node WebSocket bridge that replaces StudioMCP.exe.
- *
- * Roblox Studio hard-codes a connection to ws://localhost:13469/studio.
- * This bridge listens on that endpoint, performs the MCP client handshake
- * with Roblox Studio, and exposes an async JavaScript API to list/call tools.
- *
- * Architecture:
- *   Your code  <=async API=>  RobloxMCPBridge  <=WebSocket MCP client=>  Roblox Studio
- */
 class RobloxMCPBridge extends EventEmitter {
-  /**
-   * @param {Object} [options]
-   * @param {number} [options.port=13469]
-   * @param {string} [options.path='/studio']
-   * @param {Object} [options.clientInfo={name:'roblox-mcp-bridge',version:'1.0.0'}]
-   * @param {string} [options.protocolVersion='2024-11-05']
-   */
   constructor(options = {}) {
     super();
     this.port = options.port || 13469;
@@ -30,6 +13,12 @@ class RobloxMCPBridge extends EventEmitter {
     };
     this.protocolVersion = options.protocolVersion || "2024-11-05";
 
+    this.reconnect = options.reconnect !== false;
+    this.reconnectDelayMs = options.reconnectDelayMs || 1000;
+    this.maxReconnectDelayMs = options.maxReconnectDelayMs || 30000;
+    this.heartbeatIntervalMs = options.heartbeatIntervalMs || 15000;
+    this.heartbeatTimeoutMs = options.heartbeatTimeoutMs || 30000;
+
     this.server = null;
     this.ws = null;
     this.nextId = 0;
@@ -37,6 +26,12 @@ class RobloxMCPBridge extends EventEmitter {
     this.ready = false;
     this.serverInfo = null;
     this.tools = [];
+
+    this._reconnectTimer = null;
+    this._currentReconnectDelay = this.reconnectDelayMs;
+    this._heartbeatTimer = null;
+    this._heartbeatTimeout = null;
+    this._shutdown = false;
   }
 
   async start(timeoutMs = 30000) {
@@ -67,7 +62,6 @@ class RobloxMCPBridge extends EventEmitter {
       });
     });
 
-    // Wait for Roblox Studio to connect
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
         reject(
@@ -93,9 +87,14 @@ class RobloxMCPBridge extends EventEmitter {
   }
 
   stop() {
+    this._shutdown = true;
     this.ready = false;
+    this._clearReconnect();
+    this._clearHeartbeat();
     if (this.ws) {
-      this.ws.close();
+      try {
+        this.ws.close();
+      } catch {}
       this.ws = null;
     }
     for (const [id, { reject }] of this.pending) {
@@ -103,24 +102,36 @@ class RobloxMCPBridge extends EventEmitter {
     }
     this.pending.clear();
     if (this.server) {
-      this.server.close();
+      try {
+        this.server.close();
+      } catch {}
       this.server = null;
     }
   }
 
   _onConnection(ws, req) {
+    this._clearReconnect();
+    this._currentReconnectDelay = this.reconnectDelayMs;
     this.ws = ws;
     this.emit("connection", req.connection.remoteAddress);
 
     ws.on("message", (data) => this._onMessage(data));
+    ws.on("pong", () => this._handlePong());
     ws.on("close", (code, reason) => {
       this.ready = false;
       this.ws = null;
+      this.serverInfo = null;
+      this.tools = [];
+      this._clearHeartbeat();
+      for (const [id, { reject }] of this.pending) {
+        reject(new Error("Roblox Studio disconnected"));
+      }
+      this.pending.clear();
       this.emit("disconnect", code, reason?.toString());
+      this._scheduleReconnect();
     });
     ws.on("error", (err) => this.emit("error", err));
 
-    // Send initialize as the MCP client
     this._request("initialize", {
       protocolVersion: this.protocolVersion,
       capabilities: { roots: { listChanged: true } },
@@ -131,6 +142,7 @@ class RobloxMCPBridge extends EventEmitter {
         this._notify("notifications/initialized", {});
         this.ready = true;
         this.emit("ready", result);
+        this._startHeartbeat();
         this.logToStudio("[Abraxius] Bridge connected");
       })
       .catch((err) => this.emit("error", err));
@@ -174,7 +186,6 @@ class RobloxMCPBridge extends EventEmitter {
         }
         return;
       }
-      // id + method = incoming request (e.g. ping)
       if (msg.method) {
         this._handleRequest(msg.id, msg.method, msg.params);
         return;
@@ -196,7 +207,6 @@ class RobloxMCPBridge extends EventEmitter {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
       throw new Error("WebSocket not connected");
     }
-    // Wrap plain JSON-RPC in the envelope Roblox Studio expects
     const envelope = { type: "json_rpc", ...obj };
     this.ws.send(JSON.stringify(envelope));
     this.emit("send", envelope);
@@ -217,6 +227,63 @@ class RobloxMCPBridge extends EventEmitter {
 
   _notify(method, params = {}) {
     this._send({ jsonrpc: "2.0", method, params });
+  }
+
+  _startHeartbeat() {
+    this._clearHeartbeat();
+    if (this.heartbeatIntervalMs <= 0) return;
+    this._heartbeatTimer = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+        this._clearHeartbeat();
+        return;
+      }
+      try {
+        this.ws.ping();
+        this._heartbeatTimeout = setTimeout(() => {
+          this.emit("error", new Error("Heartbeat timeout; reconnecting"));
+          this.ws.terminate();
+        }, this.heartbeatTimeoutMs);
+      } catch {
+        this._clearHeartbeat();
+      }
+    }, this.heartbeatIntervalMs);
+  }
+
+  _handlePong() {
+    if (this._heartbeatTimeout) {
+      clearTimeout(this._heartbeatTimeout);
+      this._heartbeatTimeout = null;
+    }
+  }
+
+  _clearHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
+    if (this._heartbeatTimeout) {
+      clearTimeout(this._heartbeatTimeout);
+      this._heartbeatTimeout = null;
+    }
+  }
+
+  _scheduleReconnect() {
+    if (!this.reconnect || this._shutdown) return;
+    this._clearReconnect();
+    this._reconnectTimer = setTimeout(() => {
+      this.emit("reconnecting", this._currentReconnectDelay);
+      this._currentReconnectDelay = Math.min(
+        this._currentReconnectDelay * 2,
+        this.maxReconnectDelayMs,
+      );
+    }, this._currentReconnectDelay);
+  }
+
+  _clearReconnect() {
+    if (this._reconnectTimer) {
+      clearTimeout(this._reconnectTimer);
+      this._reconnectTimer = null;
+    }
   }
 
   async listTools() {
