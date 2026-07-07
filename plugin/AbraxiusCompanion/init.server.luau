@@ -20,12 +20,22 @@ local sessionId: string? = nil
 local connected = false
 local commandHandlers: { [string]: (payload: any) -> any } = {}
 local eventQueue: { any } = {}
+local recentEvents: { any } = {}
 local sourceConnections: { [Instance]: RBXScriptConnection } = {}
 local lastReportedSource: { [string]: string } = {}
 local subscriptions: { [string]: boolean } = {
 	selection_changed = true,
 	source_changed = true,
 }
+local widget: DockWidgetPluginGui? = nil
+local statusLabel: TextLabel? = nil
+local sessionLabel: TextLabel? = nil
+local modeLabel: TextLabel? = nil
+local watchedLabel: TextLabel? = nil
+local pendingLabel: TextLabel? = nil
+local eventsLabel: TextLabel? = nil
+local lastErrorLabel: TextLabel? = nil
+local lastError = "None"
 
 local function post(path: string, payload: any): (boolean, any)
 	local ok, result = pcall(function()
@@ -72,11 +82,150 @@ local function eventAllowed(eventType: string): boolean
 	return subscriptions[eventType] == true
 end
 
+local function rememberEvent(event: any)
+	table.insert(recentEvents, 1, event)
+	while #recentEvents > 8 do
+		table.remove(recentEvents)
+	end
+end
+
 local function queueEvent(event: any)
 	if typeof(event) ~= "table" then return end
 	if not event.type or eventAllowed(event.type) then
+		rememberEvent(event)
 		table.insert(eventQueue, event)
 	end
+end
+
+local function createText(parent: Instance, text: string, height: number, textSize: number, bold: boolean?): TextLabel
+	local label = Instance.new("TextLabel")
+	label.BackgroundTransparency = 1
+	label.BorderSizePixel = 0
+	label.Font = if bold then Enum.Font.SourceSansBold else Enum.Font.SourceSans
+	label.Text = text
+	label.TextColor3 = Color3.fromRGB(230, 236, 245)
+	label.TextSize = textSize
+	label.TextWrapped = true
+	label.TextXAlignment = Enum.TextXAlignment.Left
+	label.TextYAlignment = Enum.TextYAlignment.Top
+	label.Size = UDim2.new(1, 0, 0, height)
+	label.Parent = parent
+	return label
+end
+
+local function createButton(parent: Instance, text: string): TextButton
+	local button = Instance.new("TextButton")
+	button.AutoButtonColor = true
+	button.BackgroundColor3 = Color3.fromRGB(55, 73, 96)
+	button.BorderSizePixel = 0
+	button.Font = Enum.Font.SourceSansBold
+	button.Text = text
+	button.TextColor3 = Color3.fromRGB(255, 255, 255)
+	button.TextSize = 14
+	button.Size = UDim2.new(1, 0, 0, 30)
+	button.Parent = parent
+	return button
+end
+
+local function formatEvent(event: any): string
+	if typeof(event) ~= "table" then
+		return "unknown"
+	end
+	if event.type == "source_changed" then
+		return "source_changed: " .. tostring(event.path)
+	end
+	if event.type == "selection_changed" then
+		local paths = event.paths or {}
+		if #paths == 0 then
+			return "selection_changed: none"
+		end
+		return "selection_changed: " .. table.concat(paths, ", ")
+	end
+	return tostring(event.type or "event")
+end
+
+local function updatePanel()
+	if not statusLabel then return end
+	statusLabel.Text = "Status: " .. (if connected then "Connected" else "Disconnected")
+	statusLabel.TextColor3 = if connected then Color3.fromRGB(94, 223, 148) else Color3.fromRGB(255, 120, 120)
+	if sessionLabel then
+		sessionLabel.Text = "Session: " .. (sessionId or "none")
+	end
+	if modeLabel then
+		modeLabel.Text = "Mode: " .. (if RunService:IsEdit() then "Edit" else "Play/Running")
+	end
+	if watchedLabel then
+		local count = 0
+		for _ in pairs(sourceConnections) do
+			count += 1
+		end
+		watchedLabel.Text = "Watched scripts: " .. tostring(count)
+	end
+	if pendingLabel then
+		pendingLabel.Text = "Queued events: " .. tostring(#eventQueue)
+	end
+	if lastErrorLabel then
+		lastErrorLabel.Text = "Last error: " .. lastError
+	end
+	if eventsLabel then
+		local lines = {}
+		for i = 1, math.min(#recentEvents, 6) do
+			table.insert(lines, tostring(i) .. ". " .. formatEvent(recentEvents[i]))
+		end
+		eventsLabel.Text = if #lines == 0 then "Recent events:\nNone" else "Recent events:\n" .. table.concat(lines, "\n")
+	end
+end
+
+local function createPanel()
+	local info = DockWidgetPluginGuiInfo.new(
+		Enum.InitialDockState.Right,
+		false,
+		false,
+		320,
+		420,
+		260,
+		280
+	)
+	widget = plugin:CreateDockWidgetPluginGui("AbraxiusCompanionPanel", info)
+	widget.Title = "Abraxius Companion"
+
+	local root = Instance.new("Frame")
+	root.BackgroundColor3 = Color3.fromRGB(24, 30, 38)
+	root.BorderSizePixel = 0
+	root.Size = UDim2.fromScale(1, 1)
+	root.Parent = widget
+
+	local padding = Instance.new("UIPadding")
+	padding.PaddingTop = UDim.new(0, 12)
+	padding.PaddingBottom = UDim.new(0, 12)
+	padding.PaddingLeft = UDim.new(0, 12)
+	padding.PaddingRight = UDim.new(0, 12)
+	padding.Parent = root
+
+	local layout = Instance.new("UIListLayout")
+	layout.Padding = UDim.new(0, 8)
+	layout.SortOrder = Enum.SortOrder.LayoutOrder
+	layout.Parent = root
+
+	createText(root, "Abraxius Companion", 28, 20, true)
+	statusLabel = createText(root, "Status: Disconnected", 24, 16, true)
+	sessionLabel = createText(root, "Session: none", 22, 14)
+	modeLabel = createText(root, "Mode: unknown", 22, 14)
+	watchedLabel = createText(root, "Watched scripts: 0", 22, 14)
+	pendingLabel = createText(root, "Queued events: 0", 22, 14)
+	lastErrorLabel = createText(root, "Last error: None", 42, 14)
+
+	local refreshButton = createButton(root, "Refresh Status")
+	refreshButton.MouseButton1Click:Connect(updatePanel)
+
+	local selectionButton = createButton(root, "Print Selection")
+	selectionButton.MouseButton1Click:Connect(function()
+		local result = commandHandlers["get_selection"]({})
+		print("[AbraxiusCompanion] Selection:", HttpService:JSONEncode(result.selection or {}))
+	end)
+
+	eventsLabel = createText(root, "Recent events:\nNone", 150, 13)
+	updatePanel()
 end
 
 commandHandlers["read_source"] = function(payload: any): any
@@ -256,10 +405,14 @@ local function register(): boolean
 	if ok and result and result.sessionId then
 		sessionId = result.sessionId
 		connected = true
+		lastError = "None"
+		updatePanel()
 		print("[AbraxiusCompanion] Registered with session", sessionId)
 		return true
 	end
 	connected = false
+	lastError = tostring(result or "register failed")
+	updatePanel()
 	return false
 end
 
@@ -286,11 +439,14 @@ local function runLoop()
 			warn("[AbraxiusCompanion] Report failed:", tostring(result))
 			connected = false
 			sessionId = nil
+			lastError = tostring(result)
+			updatePanel()
 			task.wait(2)
 			continue
 		end
 
 		connected = true
+		lastError = "None"
 		if result and result.commands then
 			local responses = {}
 			for _, cmd in ipairs(result.commands) do
@@ -301,6 +457,7 @@ local function runLoop()
 			end
 		end
 
+		updatePanel()
 		task.wait(POLL_INTERVAL)
 	end
 end
@@ -313,8 +470,14 @@ local function init()
 
 	local toolbar = plugin:CreateToolbar("Abraxius")
 	local button = toolbar:CreateButton("Companion", "Abraxius Studio Companion", "")
+	createPanel()
 	button.Click:Connect(function()
-		print("[AbraxiusCompanion] Connected:", connected, "Session:", sessionId or "none")
+		if widget then
+			widget.Enabled = not widget.Enabled
+			updatePanel()
+		else
+			print("[AbraxiusCompanion] Connected:", connected, "Session:", sessionId or "none")
+		end
 	end)
 
 	startWatching()
@@ -323,6 +486,10 @@ local function init()
 	plugin.Unloading:Connect(function()
 		stopWatching()
 		stopSelectionListener()
+		if widget then
+			widget:Destroy()
+			widget = nil
+		end
 	end)
 
 	task.spawn(runLoop)

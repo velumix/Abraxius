@@ -9,6 +9,7 @@ This plugin lives in Roblox Studio and talks to the Abraxius daemon on a second 
 - Responds to commands from Abraxius such as `read_source`, `get_selection`, and `get_state`.
 - Lets Abraxius verify whether a pushed file has actually landed in the datamodel (or is still sitting as an uncommitted draft).
 - Supports event subscriptions and reports recent events through `mcp plugin events`.
+- Adds an Abraxius dock widget in Studio with connection status, session id, watched script count, queued events, and recent Studio events.
 
 ## Install
 
