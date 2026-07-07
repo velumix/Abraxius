@@ -37,6 +37,15 @@ local eventsLabel: TextLabel? = nil
 local lastErrorLabel: TextLabel? = nil
 local lastError = "None"
 
+local function getModePayload(): any
+	return {
+		isEdit = RunService:IsEdit(),
+		isRunning = RunService:IsRunning(),
+		currentDataModel = if RunService:IsEdit() then "Edit" else "Play",
+		placeId = game.PlaceId,
+	}
+end
+
 local function post(path: string, payload: any): (boolean, any)
 	local ok, result = pcall(function()
 		return HttpService:RequestAsync({
@@ -401,7 +410,9 @@ local function stopSelectionListener()
 end
 
 local function register(): boolean
-	local ok, result = post("/plugin/register", { version = "1.0.0" })
+	local payload = getModePayload()
+	payload.version = "1.0.1"
+	local ok, result = post("/plugin/register", payload)
 	if ok and result and result.sessionId then
 		sessionId = result.sessionId
 		connected = true
@@ -433,6 +444,10 @@ local function runLoop()
 			sessionId = sessionId,
 			events = eventsToSend,
 			heartbeat = true,
+			isEdit = RunService:IsEdit(),
+			isRunning = RunService:IsRunning(),
+			currentDataModel = if RunService:IsEdit() then "Edit" else "Play",
+			placeId = game.PlaceId,
 		})
 
 		if not ok then
