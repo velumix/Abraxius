@@ -26,6 +26,7 @@ The `mcp` command is the main interface for managing the bridge and interacting 
 | `remember <text> [--tag <tag>] [--path <path>]` | Pin a durable project fact |
 | `memory` | List pinned project memory |
 | `memory clear [id]` | Clear all pinned memory, or one entry |
+| `npm run rust:run -- <command>` | Run the Rust control binary |
 
 ## Edit commands
 
@@ -81,6 +82,10 @@ mcp smart execute_luau '{"code":"return game.Workspace"}'
 mcp remember "MatchManager owns round flow." --tag architecture --path ServerScriptService.MatchManager
 mcp memory
 mcp ai-context
+
+# Use the Rust extension control binary
+npm run rust:check
+npm run rust:run -- ai-context
 
 # Execute Luau
 mcp execute 'print(#game.Workspace:GetChildren())'

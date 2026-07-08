@@ -1,0 +1,22 @@
+[package]
+name = "abraxius-rs"
+version = "0.1.0"
+edition = "2024"
+description = "Rust control binary for Abraxius MCP, AI context, and Studio companion workflows"
+license = "MIT"
+default-run = "abraxius-rs"
+
+[dependencies]
+axum = { version = "0.8", features = ["ws"] }
+futures-util = "0.3"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+tokio = { version = "1", features = ["full"] }
+
+[[bin]]
+name = "abraxius-rs"
+path = "src/main.rs"
+
+[[bin]]
+name = "abraxius-daemon"
+path = "src/bin/abraxius-daemon.rs"

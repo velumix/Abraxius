@@ -48,6 +48,12 @@ node cli.js call multi_edit '{"file_path":"game.ServerScriptService.MatchManager
 node cli.js smart execute_luau '{"code":"return game.Workspace"}'
 node cli.js smart multi_edit '{"file_path":"ServerScriptService.MatchManager","edits":[{"old_string":"...","new_string":"..."}]}'
 
+# Rust extension control binary
+npm run rust:check
+npm run rust:run -- ai-context
+npm run rust:run -- plugin status
+npm run rust:daemon
+
 # High-level edits
 node cli.js edit ServerScriptService.MatchManager 'local MAX = 8' 'local MAX = 12'
 node cli.js search knife
@@ -168,6 +174,7 @@ node cli.js  --HTTP-->  node server.js  --WebSocket-->  Roblox Studio
 | `remember <text>` | Pin a durable project fact in `.abraxius/memory.json` |
 | `memory` | List pinned project memory |
 | `memory clear [id]` | Clear all pinned memory, or one entry |
+| `rust:run -- <command>` | Run the Rust control binary |
 | `edit <path> <old> <new>` | Read + edit a script in one step |
 | `batch <file>` | Run a JSON batch file of tool calls |
 | `find-replace <paths-file> <old> <new>` | Find/replace across scripts |

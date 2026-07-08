@@ -14,6 +14,10 @@
     "docs:dev": "moonwave dev --code .moonwave/stub",
     "docs:build": "moonwave build --fresh --code .moonwave/stub",
     "smoke": "node scripts/smoke.js",
+    "rust:check": "cargo check --manifest-path rust/abraxius-rs/Cargo.toml",
+    "rust:build": "cargo build --manifest-path rust/abraxius-rs/Cargo.toml",
+    "rust:run": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-rs --",
+    "rust:daemon": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-daemon",
     "install-plugin": "node scripts/install-plugin.js",
     "plugin": "node scripts/install-plugin.js"
   },
