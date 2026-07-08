@@ -291,7 +291,7 @@ end
 commandHandlers["get_watched_sources"] = function(): any
 	local paths = {}
 	for inst, _ in pairs(sourceConnections) do
-		table.insert(paths, string.gsub(inst:GetFullName(), "^game%.", ""))
+		table.insert(paths, (string.gsub(inst:GetFullName(), "^game%.", "")))
 	end
 	table.sort(paths)
 	return { ok = true, count = #paths, paths = paths }
@@ -396,7 +396,7 @@ local function startSelectionListener()
 		local selected = Selection:Get()
 		local paths = {}
 		for _, inst in ipairs(selected) do
-			table.insert(paths, string.gsub(inst:GetFullName(), "^game%.", ""))
+			table.insert(paths, (string.gsub(inst:GetFullName(), "^game%.", "")))
 		end
 		queueEvent({ type = "selection_changed", paths = paths })
 	end)
