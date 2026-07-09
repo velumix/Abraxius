@@ -1,4 +1,5 @@
 const { EventEmitter } = require("events");
+const studioLogger = require("./lib/studio-logger");
 const WebSocket = require("ws");
 const http = require("http");
 
@@ -143,7 +144,7 @@ class RobloxMCPBridge extends EventEmitter {
         this.ready = true;
         this.emit("ready", result);
         this._startHeartbeat();
-        this.logToStudio("[Abraxius] Bridge connected");
+        this.logToStudio("connect", "Bridge connected");
       })
       .catch((err) => this.emit("error", err));
   }
@@ -294,14 +295,17 @@ class RobloxMCPBridge extends EventEmitter {
 
   async callTool(name, args = {}) {
     if (name !== "execute_luau") {
-      this.logToStudio(`[Abraxius] Tool call: ${name}`);
+      this.logToStudio("studio", `Tool call: ${name}`);
     }
     return this._request("tools/call", { name, arguments: args });
   }
 
-  async logToStudio(message) {
+  async logToStudio(levelOrMessage, message) {
     if (!this.ready) return;
-    const escaped = String(message)
+    const level = message ? levelOrMessage : "info";
+    const text = message || levelOrMessage;
+    const formatted = studioLogger.format(level, text);
+    const escaped = String(formatted)
       .replace(/\r\n|\r|\n/g, " ")
       .replace(/["\\]/g, "\\$&");
     try {
@@ -340,7 +344,7 @@ class RobloxMCPBridge extends EventEmitter {
   }
 
   async executeLuau(code, datamodelType = "Workspace") {
-    this.logToStudio("[Abraxius] Executing Luau");
+    this.logToStudio("studio", "Executing Luau");
     return this.callTool("execute_luau", {
       code,
       datamodel_type: datamodelType,

@@ -6,6 +6,7 @@ const os = require("os");
 const { RobloxMCPBridge } = require("./bridge");
 const { MCPContext } = require("./lib/context");
 const { PendingPushes } = require("./lib/pending");
+const logger = require("./lib/logger");
 const { PluginServer } = require("./lib/plugin-server");
 const {
   addMemory,
@@ -67,7 +68,8 @@ async function createServer(bridge) {
         url.pathname !== "/log" &&
         url.pathname !== "/context"
       ) {
-        bridge.logToStudio(`[Abraxius] HTTP ${route}`);
+        logger.http(req.method, url.pathname);
+        bridge.logToStudio("http", `${req.method} ${url.pathname}`);
       }
 
       switch (route) {
@@ -98,7 +100,8 @@ async function createServer(bridge) {
             return;
           }
           const result = await bridge.callTool(name, args);
-          bridge.logToStudio(`[Abraxius] HTTP /call: ${name}`);
+          logger.cli(name);
+          bridge.logToStudio("studio", `Tool call: ${name}`);
           try {
             if (name === "multi_edit" && args.file_path && args.edits && args.edits[0]) {
               pendingPushes.recordPush(args.file_path, args.edits[0].new_string);
@@ -144,7 +147,7 @@ async function createServer(bridge) {
             sendJson(res, 400, { error: "Missing 'message' field" });
             return;
           }
-          bridge.logToStudio(message);
+          bridge.logToStudio("studio", message);
           sendJson(res, 200, { ok: true });
           break;
         }
@@ -507,27 +510,28 @@ async function createServer(bridge) {
 
   return new Promise((resolve) => {
     server.listen(API_PORT, () => {
-      console.log(`MCP API server listening on http://localhost:${API_PORT}`);
+      logger.success(`MCP API server listening on http://localhost:${API_PORT}`);
       resolve(server);
     });
   });
 }
 
 async function runDaemon() {
+  logger.startupBanner("matrix");
   const bridge = new RobloxMCPBridge();
 
   bridge.on("listening", () =>
-    console.log("Waiting for Roblox Studio on ws://localhost:13469/studio"),
+    logger.info("Waiting for Roblox Studio on ws://localhost:13469/studio"),
   );
   bridge.on("connection", (addr) =>
-    console.log(`Roblox Studio connected from ${addr}`),
+    logger.success(`Roblox Studio connected from ${addr}`),
   );
-  bridge.on("ready", () => console.log("Studio ready"));
-  bridge.on("disconnect", () => console.log("Roblox Studio disconnected"));
+  bridge.on("ready", () => logger.success("🎮 Studio ready"));
+  bridge.on("disconnect", () => logger.warn("Roblox Studio disconnected"));
   bridge.on("reconnecting", (delay) =>
-    console.log(`Waiting for Studio reconnect in ${delay}ms`),
+    logger.info(`Waiting for Studio reconnect in ${delay}ms`),
   );
-  bridge.on("error", (err) => console.error("[bridge error]", err.message));
+  bridge.on("error", (err) => logger.error(`bridge error: ${err.message}`));
 
   await bridge.start();
   await createServer(bridge);
@@ -559,7 +563,7 @@ function startBackground() {
     const pid = fs.readFileSync(PID_FILE, "utf8").trim();
     try {
       process.kill(Number(pid), 0);
-      console.log(`Daemon already running (PID ${pid})`);
+      logger.warn(`Daemon already running (PID ${pid})`);
       return;
     } catch {
       fs.unlinkSync(PID_FILE);
@@ -575,20 +579,20 @@ function startBackground() {
   proc.unref();
 
   fs.writeFileSync(PID_FILE, String(proc.pid));
-  console.log(`Daemon started (PID ${proc.pid})`);
+  logger.startupBanner("matrix"); logger.success(`Daemon started (PID ${proc.pid})`);
 }
 
 function stopBackground() {
   if (!fs.existsSync(PID_FILE)) {
-    console.log("Daemon not running");
+    logger.warn("Daemon not running");
     return;
   }
   const pid = Number(fs.readFileSync(PID_FILE, "utf8").trim());
   try {
     process.kill(pid, "SIGTERM");
-    console.log(`Daemon stopped (PID ${pid})`);
+    logger.success(`Daemon stopped (PID ${pid})`);
   } catch (err) {
-    console.error("Failed to stop daemon:", err.message);
+    logger.error(`Failed to stop daemon: ${err.message}`);
   }
   try {
     fs.unlinkSync(PID_FILE);
@@ -616,15 +620,15 @@ if (require.main === module) {
   } else if (command === "stop") {
     stopBackground();
   } else if (command === "status") {
-    console.log(isRunning() ? "Daemon is running" : "Daemon is not running");
+    logger.info(isRunning() ? "Daemon is running" : "Daemon is not running");
   } else if (command === "--daemon") {
     runDaemon().catch((err) => {
-      console.error("Daemon failed:", err);
+      logger.error(`Daemon failed: ${err.message}`);
       process.exit(1);
     });
   } else {
     runDaemon().catch((err) => {
-      console.error("Server failed:", err);
+      logger.error(`Server failed: ${err.message}`);
       process.exit(1);
     });
   }

@@ -3,6 +3,7 @@ const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { MCPClient } = require("./client");
+const logger = require("./lib/logger");
 const { isRunning, PID_FILE, API_PORT } = require("./server");
 const { Puller } = require("./lib/pull");
 const { Pusher } = require("./lib/push");
@@ -117,7 +118,8 @@ function parseOptions(argv) {
 
 function ensureDaemon() {
   if (isRunning()) return;
-  console.log("Starting MCP daemon...");
+  logger.startupBanner("matrix");
+  logger.info("Starting MCP daemon...");
   const log = fs.openSync(
     path.join(require("os").tmpdir(), "abraxius.log"),
     "a",
@@ -171,35 +173,35 @@ async function main() {
     switch (command) {
       case "start":
         if (isRunning()) {
-          console.log("Daemon already running");
+          logger.warn("Daemon already running");
         } else {
           ensureDaemon();
           const health = await waitForReady();
-          console.log("Daemon started and connected:", health.studio);
+          logger.success("Daemon started and connected"); logger.studio(JSON.stringify(health.studio));
         }
         break;
 
       case "stop": {
         if (!isRunning()) {
-          console.log("Daemon not running");
+          logger.warn("Daemon not running");
           return;
         }
         const client = new MCPClient();
         await client.shutdown();
-        console.log("Daemon stopped");
+        logger.success("Daemon stopped");
         break;
       }
 
       case "status": {
         const running = isRunning();
-        console.log(running ? "Daemon is running" : "Daemon is not running");
+        logger.info(running ? "Daemon is running" : "Daemon is not running");
         if (running) {
           try {
             const client = new MCPClient();
             const health = await client.health();
-            console.log("Studio connected:", health.connected);
-            if (health.studio) console.log("Studio:", health.studio);
-            console.log("Uptime:", health.uptime, "s");
+            logger.info(`Studio connected: ${health.connected}`);
+            if (health.studio) logger.studio(JSON.stringify(health.studio));
+            logger.info(`Uptime: ${health.uptime} s`);
             const ctx = await client.context();
             console.log("Context:", JSON.stringify(ctx, null, 2));
           } catch (err) {
@@ -221,7 +223,7 @@ async function main() {
 
       case "tools": {
         const result = await withClient(async (c) => {
-          await c.log("[Abraxius] CLI tools");
+          logger.cli("tools"); await c.log("🧰 tools");
           return c.tools();
         });
         console.log(JSON.stringify(result.tools, null, 2));
@@ -230,7 +232,7 @@ async function main() {
 
       case "state": {
         const result = await withClient(async (c) => {
-          await c.log("[Abraxius] CLI state");
+          logger.cli("state"); await c.log("📊 state");
           return c.state();
         });
         console.log(JSON.stringify(result, null, 2));
@@ -241,7 +243,7 @@ async function main() {
         const [name, json] = args;
         if (!name) throw new Error("Tool name required");
         const result = await withClient(async (c) => {
-          await c.log(`[Abraxius] CLI call: ${name}`);
+          logger.cli("call", name); await c.log(`⚡ call ${name}`);
           return c.call(name, parseJson(json));
         });
         console.log(JSON.stringify(result, null, 2));
@@ -252,7 +254,7 @@ async function main() {
         const [name, json] = args;
         if (!name) throw new Error("Tool name required");
         const result = await withClient(async (c) => {
-          await c.log(`[Abraxius] CLI smart: ${name}`);
+          logger.cli("smart", name); await c.log(`🧠 smart ${name}`);
           return c.smartCall(name, parseJson(json));
         });
         console.log(JSON.stringify(result, null, 2));
@@ -263,7 +265,7 @@ async function main() {
         const code = args.join(" ");
         if (!code) throw new Error("Luau code required");
         const result = await withClient(async (c) => {
-          await c.log("[Abraxius] CLI execute");
+          logger.cli("execute"); await c.log("▶️ execute");
           return c.execute(code);
         });
         console.log(JSON.stringify(result, null, 2));
@@ -343,7 +345,7 @@ async function main() {
           throw new Error("Usage: mcp edit <path> <old> <new>");
         }
         const result = await withClient(async (c) => {
-          await c.log(`[Abraxius] CLI edit: ${filePath}`);
+          logger.cli("edit", filePath); await c.log(`✏️ edit ${filePath}`);
           return c.editScript(filePath, [
             { old_string: oldString, new_string: newString },
           ]);
@@ -359,7 +361,7 @@ async function main() {
         }
         const { calls, mode } = parseJson(fs.readFileSync(file, "utf8"));
         const result = await withClient(async (c) => {
-          await c.log("[Abraxius] CLI batch");
+          logger.cli("batch"); await c.log("📦 batch");
           return c.batch(calls, mode);
         });
         console.log(JSON.stringify(result, null, 2));
@@ -381,7 +383,7 @@ async function main() {
           .map((l) => l.trim())
           .filter(Boolean);
         const result = await withClient(async (c) => {
-          await c.log("[Abraxius] CLI find-replace");
+          logger.cli("find-replace"); await c.log("🔁 find-replace");
           return c.findReplace(paths, oldString, newString || "");
         });
         console.log(JSON.stringify(result, null, 2));
@@ -391,7 +393,7 @@ async function main() {
       case "search": {
         const keywords = args.join(" ");
         const result = await withClient(async (c) => {
-          await c.log("[Abraxius] CLI search");
+          logger.cli("search"); await c.log("🔍 search");
           return c.searchScripts(
             keywords
               ? {
@@ -435,7 +437,7 @@ async function main() {
         }
 
         await withClient(async (client) => {
-          await client.log(`[Abraxius] CLI pull -> ${outputDir}`);
+          logger.cli("pull", outputDir); await client.log(`📥 pull -> ${outputDir}`);
           const puller = new Puller(client, {
             outputDir,
             targets: targets.length > 0 ? targets : undefined,
@@ -466,7 +468,7 @@ async function main() {
             console.log(`Pushed ${file} -> ${studioPath}`);
             console.log(JSON.stringify(result, null, 2));
           }
-          await client.log(`[Abraxius] CLI push: ${file} -> ${studioPath}`);
+          logger.cli("push", `${file} -> ${studioPath}`); await client.log(`🚀 push ${file}`);
         });
         break;
       }
@@ -557,7 +559,7 @@ async function repl() {
 
       try {
         if (trimmed === "state") {
-          await client.log("[Abraxius] CLI repl state");
+          logger.cli("repl state"); await client.log("📊 repl state");
           console.log(JSON.stringify(await client.state(), null, 2));
           continue;
         }
@@ -567,7 +569,7 @@ async function repl() {
         }
         if (trimmed.startsWith("execute ")) {
           const code = trimmed.slice(8);
-          await client.log("[Abraxius] CLI repl execute");
+          logger.cli("repl execute"); await client.log("▶️ repl execute");
           console.log(JSON.stringify(await client.execute(code), null, 2));
           continue;
         }
@@ -578,7 +580,7 @@ async function repl() {
         const [name, ...jsonParts] = parts;
         const json = jsonParts.join(" ");
         await client.log(
-          `[Abraxius] CLI repl ${useSmart ? "smart" : "call"}: ${name}`,
+          `🎮 repl ${useSmart ? "smart" : "call"}: ${name}`,
         );
         console.log(
           JSON.stringify(
