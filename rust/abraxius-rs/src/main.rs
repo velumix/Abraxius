@@ -1,5 +1,5 @@
 use std::env;
-use std::fs;
+use std::fs::{self, OpenOptions};
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
@@ -8,6 +8,8 @@ use std::time::Duration;
 
 const API_PORT: u16 = 13470;
 const PLUGIN_FILE: &str = "AbraxiusCompanion.lua";
+const PLUGIN_INIT: &str = include_str!("../../../plugin/AbraxiusCompanion/init.server.luau");
+const PLUGIN_LOGGER: &str = include_str!("../../../plugin/AbraxiusCompanion/Logger.luau");
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -43,6 +45,7 @@ fn run() -> Result<()> {
         "pending" => pending(&args),
         "plugin" => plugin(&args),
         "install-plugin" => install_plugin(),
+        "start" => start_native_daemon(),
         "start-node" => start_node_daemon(),
         "stop" => print_http("POST", "/shutdown", Some("{}")),
         _ => Err(format!(
@@ -57,6 +60,7 @@ fn print_usage() {
 
 Usage:
   abraxius-rs status
+  abraxius-rs start
   abraxius-rs start-node
   abraxius-rs stop
   abraxius-rs tools
@@ -224,6 +228,40 @@ fn plugin(args: &[String]) -> Result<()> {
             "/plugin/call",
             Some(r#"{"command":{"type":"get_state"}}"#),
         ),
+        "inspect" => {
+            let path = args.get(1).ok_or("Usage: abraxius plugin inspect <path>")?;
+            let body = format!(
+                r#"{{"command":{{"type":"get_children","path":{}}}}}"#,
+                json_string(path)
+            );
+            print_http("POST", "/plugin/call", Some(&body))
+        }
+        "select" => {
+            if args.len() < 2 {
+                return Err("Usage: abraxius plugin select <path...>".into());
+            }
+            let paths = args[1..]
+                .iter()
+                .map(|path| json_string(path))
+                .collect::<Vec<_>>()
+                .join(",");
+            let body = format!(r#"{{"command":{{"type":"set_selection","paths":[{paths}]}}}}"#);
+            print_http("POST", "/plugin/call", Some(&body))
+        }
+        "open" => {
+            let path = args
+                .get(1)
+                .ok_or("Usage: abraxius plugin open <path> [line]")?;
+            let line = args
+                .get(2)
+                .and_then(|line| line.parse::<u32>().ok())
+                .unwrap_or(1);
+            let body = format!(
+                r#"{{"command":{{"type":"open_script","path":{},"line":{line}}}}}"#,
+                json_string(path)
+            );
+            print_http("POST", "/plugin/call", Some(&body))
+        }
         "call" => {
             let command_type = args
                 .get(1)
@@ -244,15 +282,6 @@ fn plugin(args: &[String]) -> Result<()> {
 }
 
 fn install_plugin() -> Result<()> {
-    let repo = repo_root()?;
-    let source = repo
-        .join("plugin")
-        .join("AbraxiusCompanion")
-        .join("init.server.luau");
-    if !source.exists() {
-        return Err(format!("Plugin source not found: {}", source.display()));
-    }
-
     let dest_dir = roblox_plugins_dir()?;
     fs::create_dir_all(&dest_dir).map_err(|err| err.to_string())?;
 
@@ -263,7 +292,15 @@ fn install_plugin() -> Result<()> {
     }
 
     let dest = dest_dir.join(PLUGIN_FILE);
-    fs::copy(&source, &dest).map_err(|err| err.to_string())?;
+    let logger = PLUGIN_LOGGER
+        .trim_start_matches("--!strict\r\n")
+        .trim_start_matches("--!strict\n")
+        .trim_end()
+        .strip_suffix("return Logger")
+        .unwrap_or(PLUGIN_LOGGER)
+        .trim();
+    let bundled = PLUGIN_INIT.replace("local Logger = require(script.Logger)", logger);
+    fs::write(&dest, bundled).map_err(|err| err.to_string())?;
     println!(
         "Installed AbraxiusCompanion plugin to:\n  {}",
         dest.display()
@@ -289,6 +326,85 @@ fn start_node_daemon() -> Result<()> {
         .map_err(|err| format!("failed to spawn node daemon: {err}"))?;
     println!("Started Abraxius Node daemon.");
     Ok(())
+}
+
+fn start_native_daemon() -> Result<()> {
+    if let Ok(response) = http_request("GET", "/health", None) {
+        if response.status < 400 {
+            println!("Abraxius host is already running.\n{}", response.body);
+            return Ok(());
+        }
+    }
+
+    let current = env::current_exe().map_err(|err| err.to_string())?;
+    let file_name = if cfg!(target_os = "windows") {
+        "abraxius-daemon.exe"
+    } else {
+        "abraxius-daemon"
+    };
+    let daemon = current
+        .parent()
+        .ok_or("could not resolve executable directory")?
+        .join(file_name);
+    if !daemon.exists() {
+        return Err(format!(
+            "Native host not found at {}. Build both binaries with `cargo build --release`.",
+            daemon.display()
+        ));
+    }
+
+    let log_dir = app_data_dir()?;
+    fs::create_dir_all(&log_dir).map_err(|err| err.to_string())?;
+    let log_path = log_dir.join("abraxius-host.log");
+    let stdout = OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&log_path)
+        .map_err(|err| err.to_string())?;
+    let stderr = stdout.try_clone().map_err(|err| err.to_string())?;
+    let mut command = Command::new(&daemon);
+    command
+        .stdin(Stdio::null())
+        .stdout(Stdio::from(stdout))
+        .stderr(Stdio::from(stderr));
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        command.creation_flags(0x08000000);
+    }
+    command
+        .spawn()
+        .map_err(|err| format!("failed to start native host: {err}"))?;
+
+    for _ in 0..50 {
+        std::thread::sleep(Duration::from_millis(100));
+        if let Ok(response) = http_request("GET", "/health", None) {
+            if response.status < 400 {
+                println!("Started Abraxius native host.\n{}", response.body);
+                println!("Log: {}", log_path.display());
+                return Ok(());
+            }
+        }
+    }
+    Err(format!(
+        "Native host did not become ready. Check {}",
+        log_path.display()
+    ))
+}
+
+fn app_data_dir() -> Result<PathBuf> {
+    if cfg!(target_os = "windows") {
+        let base = env::var("LOCALAPPDATA")
+            .or_else(|_| env::var("USERPROFILE").map(|home| format!("{home}\\AppData\\Local")))
+            .map_err(|_| "LOCALAPPDATA is not set".to_string())?;
+        Ok(PathBuf::from(base).join("Abraxius"))
+    } else {
+        let home = env::var("HOME").map_err(|_| "HOME is not set".to_string())?;
+        Ok(PathBuf::from(home)
+            .join(".local")
+            .join("share")
+            .join("abraxius"))
+    }
 }
 
 struct HttpResponse {

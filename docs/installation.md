@@ -1,70 +1,68 @@
 # Installation
 
-## Clone and install
+## Requirements
 
-```bash
+- Windows 10 or Windows 11
+- Node.js 18+
+- Rust toolchain
+- .NET 9 SDK
+- Windows Developer Mode for development package registration
+- Roblox Studio with **Allow HTTP Requests** enabled
+
+## Install dependencies
+
+```powershell
 git clone https://github.com/velumix/Abraxius.git
 cd Abraxius
 npm install
+npm run rust:build
 ```
 
-## Global install (optional)
+## Install the Studio companion
 
-To use the `mcp` command from anywhere:
-
-```bash
-npm install -g .
-mcp status
-mcp pull ./my-game
-```
-
-## Requirements
-
-- Node.js 18+
-- Roblox Studio open with MCP enabled in Assistant Settings
-- No other MCP bridge running on `ws://localhost:13469/studio`
-
-## Enable MCP in Roblox Studio
-
-1. Open Roblox Studio.
-2. Go to **File > Studio Settings > Assistant**.
-3. Enable **MCP (Model Context Protocol)**.
-4. Restart Studio if prompted.
-
-Once enabled, Studio will attempt to connect to `ws://localhost:13469/studio` whenever a place is open.
-
-## (Optional but recommended) Install the Studio Companion Plugin
-
-The companion plugin gives Abraxius real-time visibility into Studio state and makes Draft Mode pushes trackable.
-
-```bash
+```powershell
 npm run install-plugin
 ```
 
-This installs one local plugin script:
+This installs `%LOCALAPPDATA%\Roblox\Plugins\AbraxiusCompanion.lua`. Restart
+Studio after protecting unsaved work. In Studio, open **Game Settings >
+Security** and enable **Allow HTTP Requests**.
 
-```text
-Roblox/Plugins/AbraxiusCompanion.lua
+## Build and run the Windows app
+
+```powershell
+npm run app:build
+npm run app:run
 ```
 
-Then restart Roblox Studio. You should see an **Abraxius** toolbar with a **Companion** button.
+`app:run` registers and launches the development package. Abraxius then appears
+in Start and can be pinned to the taskbar. Closing its window leaves the app and
+Rust server active in the notification area.
 
-Do not install the source folder as `AbraxiusCompanion/init.server.luau`; `init` files have Rojo-style folder semantics, and the local Studio plugin should be a single script file.
+## Verify
 
-The plugin needs **HTTP Requests** enabled:
-
-1. Open **Game Settings**.
-2. Go to **Security**.
-3. Enable **Allow HTTP Requests**.
-
-The plugin connects to `http://localhost:13471`.
-
-## Verify the installation
-
-```bash
+```powershell
 npm run smoke
-mcp status
-mcp ai-context
+node cli.js plugin status
+node cli.js plugin inspect Workspace
+node cli.js pull game
 ```
 
-`mcp ai-context` works even when the daemon is not connected to Studio, because pinned memory is stored locally in `.abraxius/memory.json`.
+The app should show **Server: Running** and **Companion: Connected**. The Studio
+MCP card may remain **Waiting** while companion-based sync continues to work.
+
+## Optional global CLI
+
+```powershell
+npm install -g .
+mcp status
+mcp pull game
+```
+
+## MCP compatibility
+
+Current Roblox Studio releases expose their official MCP client through
+`%LOCALAPPDATA%\Roblox\mcp.bat` and `StudioMCP.exe` using stdio. Abraxius's
+legacy WebSocket route is not a replacement for that transport. Generic MCP
+calls, targeted pull, and new-script creation require a compatible MCP
+connection; companion-based full pull and existing-script push do not.

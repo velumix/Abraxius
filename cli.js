@@ -60,6 +60,10 @@ Plugin:
   plugin events [limit] Show recent Studio companion events
   plugin selection      Show current Studio Explorer selection
   plugin state          Show plugin-observed Studio state
+  plugin inspect <path> List an instance's direct children
+  plugin select <paths> Select one or more Studio instances
+  plugin open <path> [line]
+                        Open a Studio script at a line
   plugin call <type> [json]
                         Send a raw command to the Studio companion plugin
   pending               List pending pushes (Draft Mode tracking)
@@ -75,7 +79,8 @@ Sync:
   pull --targets-file <file> [dir]
                         Pull a list of Studio paths from a file (one per line).
   push <file>           Push a local script file back to Studio using multi_edit.
-                        Requires the file to be inside a place.json project.
+                        Uses the companion when MCP is offline. Requires the
+                        file to be inside a place.json project.
 `;
 
 function findProjectDir(startPath) {
@@ -152,10 +157,30 @@ async function waitForReady(timeoutMs = 20000) {
   );
 }
 
-async function withClient(fn) {
-  if (!isRunning()) {
-    ensureDaemon();
+async function waitForDaemon(timeoutMs = 5000) {
+  const client = new MCPClient();
+  const start = Date.now();
+  while (Date.now() - start < timeoutMs) {
+    try {
+      const health = await client.health();
+      if (health.running) return health;
+    } catch {}
+    await new Promise((r) => setTimeout(r, 100));
   }
+  throw new Error(`Daemon did not open its API within ${timeoutMs}ms. Check: mcp logs`);
+}
+
+async function probeDaemon() {
+  try {
+    const health = await new MCPClient().health();
+    return health.running ? health : null;
+  } catch {
+    return null;
+  }
+}
+
+async function withClient(fn) {
+  if (!(await probeDaemon())) ensureDaemon();
   const health = await waitForReady();
   if (!health.connected) {
     throw new Error(
@@ -166,23 +191,35 @@ async function withClient(fn) {
   return fn(client);
 }
 
+async function withDaemonClient(fn) {
+  if (!(await probeDaemon())) ensureDaemon();
+  await waitForDaemon();
+  return fn(new MCPClient());
+}
+
 async function main() {
   const [, , command, ...args] = process.argv;
 
   try {
     switch (command) {
       case "start":
-        if (isRunning()) {
+        if (await probeDaemon()) {
           logger.warn("Daemon already running");
         } else {
           ensureDaemon();
-          const health = await waitForReady();
-          logger.success("Daemon started and connected"); logger.studio(JSON.stringify(health.studio));
+          const health = await waitForDaemon();
+          logger.success("Daemon started");
+          if (health.connected) {
+            logger.success("Studio connected");
+            logger.studio(JSON.stringify(health.studio));
+          } else {
+            logger.info("Studio is not connected yet; the daemon will keep listening");
+          }
         }
         break;
 
       case "stop": {
-        if (!isRunning()) {
+        if (!(await probeDaemon())) {
           logger.warn("Daemon not running");
           return;
         }
@@ -193,12 +230,12 @@ async function main() {
       }
 
       case "status": {
-        const running = isRunning();
+        const health = await probeDaemon();
+        const running = !!health;
         logger.info(running ? "Daemon is running" : "Daemon is not running");
         if (running) {
           try {
             const client = new MCPClient();
-            const health = await client.health();
             logger.info(`Studio connected: ${health.connected}`);
             if (health.studio) logger.studio(JSON.stringify(health.studio));
             logger.info(`Uptime: ${health.uptime} s`);
@@ -212,7 +249,11 @@ async function main() {
       }
 
       case "logs": {
-        const logPath = path.join(require("os").tmpdir(), "abraxius.log");
+        const nativeLog = process.env.LOCALAPPDATA
+          ? path.join(process.env.LOCALAPPDATA, "Abraxius", "abraxius-host.log")
+          : null;
+        const nodeLog = path.join(require("os").tmpdir(), "abraxius.log");
+        const logPath = nativeLog && fs.existsSync(nativeLog) ? nativeLog : nodeLog;
         if (!fs.existsSync(logPath)) {
           console.log("No log file yet");
           return;
@@ -436,13 +477,14 @@ async function main() {
           }
         }
 
-        await withClient(async (client) => {
+        const runWithClient = targets.length > 0 ? withClient : withDaemonClient;
+        await runWithClient(async (client) => {
           logger.cli("pull", outputDir); await client.log(`📥 pull -> ${outputDir}`);
           const puller = new Puller(client, {
             outputDir,
             targets: targets.length > 0 ? targets : undefined,
-            concurrency: 4,
-            delayMs: 50,
+            concurrency: 16,
+            delayMs: 0,
             onProgress: (action, target) =>
               console.log(`[${action}] ${target}`),
           });
@@ -459,7 +501,7 @@ async function main() {
         const projectDir = findProjectDir(file);
         if (!projectDir)
           throw new Error(`Could not find place.json for ${file}`);
-        await withClient(async (client) => {
+        await withDaemonClient(async (client) => {
           const pusher = new Pusher(client, { projectDir });
           const { changed, studioPath, result } = await pusher.push(file);
           if (!changed) {
@@ -476,7 +518,7 @@ async function main() {
 
       case "plugin": {
         const [sub, ...pluginArgs] = args;
-        const result = await withClient(async (c) => {
+        const result = await withDaemonClient(async (c) => {
           if (!sub || sub === "status") {
             return c.pluginStatus();
           }
@@ -490,13 +532,29 @@ async function main() {
           if (sub === "state") {
             return c.pluginCall({ type: "get_state" });
           }
+          if (sub === "inspect") {
+            if (!pluginArgs[0]) throw new Error("Usage: mcp plugin inspect <path>");
+            return c.pluginCall({ type: "get_children", path: pluginArgs[0] });
+          }
+          if (sub === "select") {
+            if (pluginArgs.length === 0) throw new Error("Usage: mcp plugin select <path...>");
+            return c.pluginCall({ type: "set_selection", paths: pluginArgs });
+          }
+          if (sub === "open") {
+            if (!pluginArgs[0]) throw new Error("Usage: mcp plugin open <path> [line]");
+            return c.pluginCall({
+              type: "open_script",
+              path: pluginArgs[0],
+              line: pluginArgs[1] ? Number(pluginArgs[1]) : 1,
+            });
+          }
           if (sub === "call") {
             const [type, json] = pluginArgs;
             if (!type) throw new Error("Usage: mcp plugin call <type> [json]");
             return c.pluginCall({ type, ...parseJson(json) });
           }
           throw new Error(
-            "Usage: mcp plugin [status|events|selection|state|call]",
+            "Usage: mcp plugin [status|events|selection|state|inspect|select|open|call]",
           );
         });
         console.log(JSON.stringify(result, null, 2));

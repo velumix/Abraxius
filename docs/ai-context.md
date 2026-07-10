@@ -13,6 +13,13 @@ Abraxius makes AI context explicit. Instead of asking an AI agent to infer the p
 - pending Studio pushes and Draft Mode verification status
 - companion plugin connection state
 - recent Studio events such as selection and source changes
+- current selection, active/open scripts, service sizes, script counts, and tags
+- source hashes, hierarchy batches, play-mode transitions, warnings, and errors
+- ChangeHistory recordings, undo, and redo activity
+
+Source changes are debounced into edit sessions after 1.25 seconds of inactivity.
+Each event includes the original and final source hashes, final source length,
+underlying change count, and session duration instead of one event per keystroke.
 
 Use JSON when another tool needs structured data:
 

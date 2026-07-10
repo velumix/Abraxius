@@ -1,152 +1,89 @@
 # API Reference
 
-Abraxius exposes three main layers: the WebSocket bridge, the HTTP client, and the sync helpers.
+Abraxius exposes a local HTTP API, the Studio companion channel, sync helpers,
+and a legacy MCP compatibility listener.
 
 ## Ports
 
 | Port | Purpose |
-|---|---|
-| `13469` | MCP WebSocket bridge (`/studio`) — Roblox Studio connects here |
-| `13470` | Main HTTP API for the CLI and programmatic clients |
-| `13471` | Studio Companion Plugin channel (HTTP long-poll) |
+|---:|---|
+| `13469` | Legacy MCP WebSocket listener at `/studio` |
+| `13470` | Main local HTTP API |
+| `13471` | Studio companion long-poll channel |
 
-## `RobloxMCPBridge`
+## HTTP client
 
-Defined in `bridge.js`. Handles the MCP client handshake over WebSocket.
-
-### Constructor
-
-```js
-const { RobloxMCPBridge } = require("./bridge");
-const bridge = new RobloxMCPBridge({
-  port: 13469,
-  path: "/studio",
-  clientInfo: { name: "roblox-mcp-bridge", version: "1.0.0" },
-  protocolVersion: "2024-11-05",
-});
-```
-
-### Methods
-
-| Method | Description |
-|---|---|
-| `start(timeoutMs)` | Start WebSocket server and wait for Studio |
-| `stop()` | Close the bridge |
-| `listTools()` | List available MCP tools |
-| `callTool(name, args)` | Call an MCP tool |
-| `getStudioState()` | Get current Studio state |
-| `executeLuau(code, datamodelType)` | Execute Luau in Studio |
-| `logToStudio(message)` | Print a message to Studio output |
-
-### Events
-
-- `listening`
-- `connection`
-- `ready`
-- `disconnect`
-- `error`
-
-## `MCPClient`
-
-Defined in `client.js`. Talks to the local HTTP API served by `server.js`.
+`client.js` exports `MCPClient`, used by the Node CLI and sync helpers.
 
 ```js
 const { MCPClient } = require("./client");
 const client = new MCPClient();
 
 await client.health();
-await client.tools();
-await client.state();
-await client.call("execute_luau", { code: 'print("hi")', datamodel_type: "Edit" });
-await client.execute("print('hi')");
-await client.pending();
-await client.pendingVerify();
 await client.pluginStatus();
-await client.pluginEvents({ limit: 20 });
-await client.pluginCall({ type: "get_selection" });
-await client.remember("MatchManager owns round flow.", {
-  tags: ["architecture"],
-  path: "ServerScriptService.MatchManager",
-});
+await client.pluginCall({ type: "get_children", path: "Workspace" });
 await client.aiContext({ format: "markdown" });
-await client.shutdown();
 ```
 
-## AI context and memory
-
-Abraxius stores durable project memory in `.abraxius/memory.json` under the active project directory. This is intentionally explicit: pinned memory is treated as long-lived project context, while recent operations and plugin events are short-lived session context.
-
-### HTTP endpoints
+## Core endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| `GET` | `/ai-context` | Full AI context snapshot as JSON |
-| `GET` | `/ai-context?format=markdown` | Full AI context snapshot as Markdown |
-| `GET` | `/memory` | Read pinned memory |
-| `POST` | `/memory` | Add pinned memory with `text`, optional `tags`, `path`, and `projectDir` |
-| `POST` | `/memory/clear` | Clear all memory, or one entry with `id` |
+| `GET` | `/health` | Daemon, MCP, and companion status |
+| `GET` | `/tools` | Connected MCP tools |
+| `POST` | `/call` | Call an MCP tool |
+| `GET` | `/state` | Connected MCP Studio state |
+| `POST` | `/execute` | Execute Luau through MCP |
+| `GET` | `/ai-context` | AI context snapshot |
+| `GET` | `/ai-context?format=markdown` | Markdown AI briefing |
+| `GET` | `/memory` | Pinned project memory |
+| `POST` | `/memory` | Add pinned memory |
+| `POST` | `/memory/clear` | Clear memory |
+| `POST` | `/shutdown` | Stop the daemon |
 
-## `PluginServer`
+MCP endpoints return `503` when the MCP transport is disconnected. Health,
+memory, and companion endpoints remain available.
 
-Defined in `lib/plugin-server.js`. Serves the Studio companion plugin on port `13471`.
-
-```js
-const { PluginServer } = require("./lib/plugin-server");
-const pluginServer = new PluginServer({ port: 13471 });
-await pluginServer.start();
-
-pluginServer.on("connect", (session) => console.log("plugin connected", session.id));
-pluginServer.on("event", (ev) => console.log("plugin event", ev));
-
-const result = await pluginServer.callPlugin({ type: "read_source", path: "ServerScriptService.MatchManager" });
-const events = pluginServer.listEvents({ limit: 20 });
-```
-
-### Plugin endpoints
+## Companion endpoints
 
 | Method | Path | Description |
 |---|---|---|
-| `POST` | `/plugin/register` | Plugin says hello and gets a session id |
-| `POST` | `/plugin/report` | Plugin sends events/heartbeats and receives commands |
-| `GET` | `/plugin/status` | Connection status |
-| `GET` | `/plugin/events` | Recent companion events, with `limit` and `since` query params |
-| `POST` | `/plugin/call` | Bridge a one-off command to the plugin |
+| `POST` | `/plugin/register` | Register a Studio plugin session |
+| `POST` | `/plugin/report` | Report events and receive queued commands |
+| `GET` | `/plugin/status` | Read companion status |
+| `GET` | `/plugin/events` | Read recent Studio events |
+| `POST` | `/plugin/call` | Send one command to the plugin |
 
-### Commands the plugin handles
+The request body for `/plugin/call` is:
 
-- `read_source` — returns `Script.Source` for a given Studio path
-- `get_selection` — returns the current Explorer selection
-- `get_state` — returns edit/play mode state
-- `resolve_path` — resolves a Studio path to instance info
-- `subscribe` — subscribes to event types
-- `ping` — returns plugin heartbeat details
-- `get_watched_sources` — returns watched script paths
-
-## `PendingPushes`
-
-Defined in `lib/pending.js`. Tracks pushes that are waiting for Studio commit.
-
-```js
-const { PendingPushes } = require("./lib/pending");
-const pending = new PendingPushes();
-
-pending.recordPush("game.ServerScriptService.MatchManager", source);
-pending.verify("game.ServerScriptService.MatchManager", currentSource);
-pending.list();
-pending.clear("game.ServerScriptService.MatchManager");
+```json
+{
+  "command": {
+    "type": "get_children",
+    "path": "Workspace"
+  }
+}
 ```
 
-### HTTP endpoints
+## Companion commands
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/pending` | List recorded pushes |
-| `POST` | `/pending/verify` | Verify pending pushes against the live datamodel via the plugin |
-| `POST` | `/pending/clear` | Clear one or all pending records |
+| Type | Purpose |
+|---|---|
+| `read_source` | Read `LuaSourceContainer.Source` |
+| `export_scripts` | Export script paths, classes, sources, and metadata |
+| `get_children` | List direct children |
+| `get_selection` / `set_selection` | Read or change Explorer selection |
+| `open_script` | Open a script at a line |
+| `get_state` | Read edit/play state |
+| `resolve_path` | Resolve a Studio path |
+| `get_properties` / `set_properties` | Read or set supported properties |
+| `get_context_snapshot` | Read companion-observed context |
+| `ping` | Verify the session |
 
-## `Puller`
+## Puller
 
-Defined in `lib/pull.js`. Pulls scripts from Studio into a local project.
+`lib/pull.js` first requests `export_scripts` from the companion. A full export
+therefore works without MCP.
 
 ```js
 const { Puller } = require("./lib/pull");
@@ -154,12 +91,26 @@ const puller = new Puller(client, { outputDir: "./game" });
 const { project, stats } = await puller.pull();
 ```
 
-## `Pusher`
+Targeted pulls use MCP discovery and `script_read`.
 
-Defined in `lib/push.js`. Pushes a local script file back to Studio using `multi_edit`.
+## Pusher
+
+`lib/push.js` resolves a file through `place.json`. With MCP connected it uses
+MCP editing tools. Otherwise it updates an existing script through the
+companion's property command and verifies the result with `read_source`.
 
 ```js
 const { Pusher } = require("./lib/push");
 const pusher = new Pusher(client, { projectDir: "./game" });
-const { changed, studioPath, result } = await pusher.push("./game/src/...");
+const result = await pusher.push(
+  "./game/src/ServerScriptService/KnitServer.server.luau",
+);
 ```
+
+Companion fallback does not create missing script instances.
+
+## Legacy MCP bridge
+
+`bridge.js` and the Rust daemon expose `/studio` for the earlier Studio
+WebSocket transport. Current Roblox releases use `StudioMCP.exe` over stdio;
+do not use `health.connected` as a prerequisite for companion operations.

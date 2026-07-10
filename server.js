@@ -533,9 +533,13 @@ async function runDaemon() {
   );
   bridge.on("error", (err) => logger.error(`bridge error: ${err.message}`));
 
-  await bridge.start();
-  await createServer(bridge);
-  await pluginServer.start();
+  // All local endpoints must remain available while Studio connects or
+  // reconnects. Studio readiness is connection state, not daemon readiness.
+  await Promise.all([
+    bridge.start(),
+    createServer(bridge),
+    pluginServer.start(),
+  ]);
 
   pluginServer.on("connect", async () => {
     try {
@@ -548,6 +552,7 @@ async function runDaemon() {
   });
 
   pluginServer.on("event", async (ev) => {
+    context.ingestStudioEvent(ev);
     if (ev && ev.type === "source_changed" && pendingPushes.get(ev.path)) {
       try {
         const result = await pluginServer.callPlugin({ type: "read_source", path: ev.path });

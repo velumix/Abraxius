@@ -1,9 +1,9 @@
 title = "Abraxius"
-description = "Abraxius - AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio"
+description = "Abraxius - Windows host, Studio companion, and verified script sync for Roblox Studio"
 
 [docusaurus]
 title = "Abraxius"
-tagline = "AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio"
+tagline = "Windows host, Studio companion, and verified script sync for Roblox Studio"
 baseUrl = "/Abraxius/"
 organizationName = "velumix"
 projectName = "abraxius"
@@ -16,8 +16,8 @@ enabled = true
 includeReadme = true
 
 [[home.features]]
-title = "Background Bridge"
-description = "Keep a persistent MCP WebSocket bridge to Roblox Studio running in the background with a local HTTP API for tools and agents."
+title = "Windows Host"
+description = "Keep the Rust daemon active from a themed WinUI 3 app with taskbar, tray, startup, and server lifecycle controls."
 
 [[home.features]]
 title = "AI Context Memory"
@@ -25,8 +25,12 @@ description = "Give AI sessions one clear briefing with pinned project memory, r
 
 [[home.features]]
 title = "Studio Companion"
-description = "Track selection, source changes, play mode, and Draft Mode verification through the Abraxius Studio Companion plugin."
+description = "Inspect the live DataModel, export scripts, track Studio activity, and verify source through the companion channel."
 
 [[home.features]]
 title = "Script Sync"
-description = "Pull scripts from Studio into a local project and push edits back with multi_edit using familiar Luau file conventions."
+description = "Pull complete Luau projects and push existing script edits back through the companion with read-back verification."
+
+[[home.features]]
+title = "Codex Skill"
+description = "Use the repository-local Abraxius Studio Sync skill for guarded pull, edit, push, verification, and recovery workflows."
