@@ -1,72 +1,74 @@
-# Rust Extension
+# Rust Host and WinUI App
 
-Abraxius includes a Rust crate at `rust/abraxius-rs` with two binaries:
+Abraxius includes two Rust binaries and a packaged WinUI 3 frontend:
 
-- `abraxius-rs`: a native control CLI for the Abraxius API and plugin workflows.
-- `abraxius-daemon`: a Rust daemon that serves the MCP WebSocket bridge, HTTP API, and Studio companion plugin channel.
+- `abraxius.exe`: native control CLI
+- `abraxius-daemon.exe`: local API and companion host
+- `Abraxius.App.exe`: Windows supervisor
 
 ## Build
 
-```bash
+```powershell
 npm run rust:check
 npm run rust:build
+npm run app:build
 ```
 
-Or use Cargo directly:
-
-```bash
-cargo build --manifest-path rust/abraxius-rs/Cargo.toml
-```
+The Rust release binaries are written under
+`rust/abraxius-rs/target/release/`. The app build embeds the daemon in its
+packaged output.
 
 ## Run
 
-```bash
+```powershell
+npm run app:run
+```
+
+For CLI-only control:
+
+```powershell
 npm run rust:run -- status
-npm run rust:run -- ai-context
 npm run rust:run -- plugin status
-npm run rust:run -- pending
+npm run rust:run -- plugin inspect Workspace
+npm run rust:run -- ai-context
 ```
 
-Run the Rust daemon:
-
-```bash
-npm run rust:daemon
-```
-
-It listens on the same ports as the Node daemon:
+## Ports
 
 | Port | Purpose |
-|---|---|
-| `13469` | MCP WebSocket bridge at `/studio` |
-| `13470` | Main HTTP API |
-| `13471` | Studio companion plugin long-poll channel |
+|---:|---|
+| `13469` | Legacy MCP WebSocket listener at `/studio` |
+| `13470` | Main local HTTP API |
+| `13471` | Studio companion long-poll channel |
 
-After building, the binary is available under Cargo's target directory:
+## Windows lifecycle
 
-```bash
-rust/abraxius-rs/target/debug/abraxius-rs.exe
-```
+The WinUI app:
 
-## Commands
+- starts and supervises the embedded Rust daemon
+- displays server, MCP, and companion states independently
+- hides to the notification area when its window closes
+- restores the existing process on repeated Start/taskbar activation
+- supports server restart without duplicating supervisors
+- optionally launches through a packaged Windows startup task
+- stops both the daemon and app through **Quit Abraxius**
+
+The app follows the Windows system theme using WinUI theme resources and Mica.
+
+## Rust CLI commands
 
 | Command | Description |
 |---|---|
-| `status` | Read daemon health from `localhost:13470` |
-| `start-node` | Start the existing Node daemon |
-| `stop` | Ask the daemon to shut down |
-| `tools` | List MCP tools |
-| `state` | Read Studio state |
-| `call <tool> [json]` | Call an MCP tool |
-| `execute <luau>` | Execute Luau through the daemon |
-| `ai-context [--json]` | Print the AI context briefing |
-| `remember <text>` | Add pinned project memory |
-| `memory [clear [id]]` | Read or clear pinned memory |
-| `pending [verify|clear]` | Inspect or verify pending Studio pushes |
-| `plugin ...` | Inspect or command the Studio companion plugin |
-| `install-plugin` | Install the companion as `AbraxiusCompanion.lua` |
+| `status` | Read daemon health |
+| `start` | Start the native daemon in the background |
+| `start-node` | Start the legacy Node daemon |
+| `stop` | Shut down the active daemon |
+| `tools`, `state`, `call`, `execute` | Use connected MCP tools |
+| `plugin ...` | Inspect or command the companion |
+| `pending ...` | Read or verify tracked pushes |
+| `ai-context` | Build an AI briefing |
+| `remember`, `memory` | Manage durable project memory |
+| `install-plugin` | Install the companion plugin |
 
-## Current role
-
-The Rust daemon now implements the core bridge shape directly: MCP initialization, JSON-RPC tool calls, health/tools/state/execute endpoints, AI context memory, pending push tracking, and companion plugin command/event polling.
-
-The Node daemon remains available as the mature fallback while the Rust daemon reaches full CLI parity for high-level sync helpers such as pull and push.
+The Node CLI remains the high-level interface for project pull and push. It
+uses the API hosted by the app's Rust daemon.

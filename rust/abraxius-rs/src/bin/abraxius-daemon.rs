@@ -97,6 +97,7 @@ struct AppState {
     context: Arc<Mutex<ContextState>>,
     plugin: Arc<Mutex<PluginState>>,
     pending_pushes: Arc<Mutex<HashMap<String, PendingPush>>>,
+    started_at: Instant,
 }
 
 impl AppState {
@@ -106,6 +107,7 @@ impl AppState {
             context: Arc::new(Mutex::new(ContextState::default())),
             plugin: Arc::new(Mutex::new(PluginState::default())),
             pending_pushes: Arc::new(Mutex::new(HashMap::new())),
+            started_at: Instant::now(),
         }
     }
 }
@@ -120,6 +122,7 @@ struct BridgeState {
     server_info: Option<Value>,
     tools: Vec<Value>,
     connected_at: Option<Instant>,
+    generation: u64,
 }
 
 #[derive(Default, Serialize)]
@@ -130,6 +133,10 @@ struct ContextState {
     current_datamodel: Option<String>,
     recent_scripts: VecDeque<String>,
     recent_operations: VecDeque<Operation>,
+    studio: Value,
+    studio_event_counts: HashMap<String, u64>,
+    recent_studio_events: VecDeque<Value>,
+    recent_studio_errors: VecDeque<Value>,
 }
 
 #[derive(Clone, Serialize)]
@@ -180,16 +187,21 @@ async fn handle_mcp_socket(socket: WebSocket, state: AppState) -> Result<(), Str
     let (mut sink, mut stream) = socket.split();
     let (tx, mut rx) = mpsc::unbounded_channel::<Value>();
 
-    {
+    let generation = {
         let mut bridge = state.bridge.lock().await;
-        if bridge.connected {
+        if bridge.connected && bridge.ready {
             return Err("Studio already connected".into());
+        }
+        for (_, pending) in bridge.pending.drain() {
+            let _ = pending.send(Err("Studio connection replaced".into()));
         }
         bridge.connected = true;
         bridge.ready = false;
         bridge.sender = Some(tx.clone());
         bridge.connected_at = Some(Instant::now());
-    }
+        bridge.generation += 1;
+        bridge.generation
+    };
 
     let writer = tokio::spawn(async move {
         while let Some(value) = rx.recv().await {
@@ -203,7 +215,24 @@ async fn handle_mcp_socket(socket: WebSocket, state: AppState) -> Result<(), Str
         }
     });
 
-    let init_result = bridge_request(
+    let reader_state = state.clone();
+    let reader = tokio::spawn(async move {
+        while let Some(message) = stream.next().await {
+            match message.map_err(|err| err.to_string())? {
+                Message::Text(text) => handle_mcp_message(&reader_state, &text).await?,
+                Message::Binary(bytes) => {
+                    if let Ok(text) = String::from_utf8(bytes.to_vec()) {
+                        handle_mcp_message(&reader_state, &text).await?;
+                    }
+                }
+                Message::Close(_) => break,
+                _ => {}
+            }
+        }
+        Ok::<(), String>(())
+    });
+
+    let init_result = match bridge_request(
         &state,
         "initialize",
         json!({
@@ -212,30 +241,43 @@ async fn handle_mcp_socket(socket: WebSocket, state: AppState) -> Result<(), Str
             "clientInfo": { "name": "abraxius-rs", "version": env!("CARGO_PKG_VERSION") }
         }),
     )
-    .await?;
+    .await
+    {
+        Ok(result) => result,
+        Err(err) => {
+            reader.abort();
+            writer.abort();
+            cleanup_mcp_connection(&state, generation).await;
+            return Err(err);
+        }
+    };
     {
         let mut bridge = state.bridge.lock().await;
         bridge.server_info = Some(init_result);
         bridge.ready = true;
     }
-    bridge_notify(&state, "notifications/initialized", json!({})).await?;
+    if let Err(err) = bridge_notify(&state, "notifications/initialized", json!({})).await {
+        reader.abort();
+        writer.abort();
+        cleanup_mcp_connection(&state, generation).await;
+        return Err(err);
+    }
     let _ = log_to_studio(&state, "[Abraxius] Rust bridge connected").await;
 
-    while let Some(message) = stream.next().await {
-        match message.map_err(|err| err.to_string())? {
-            Message::Text(text) => handle_mcp_message(&state, &text).await?,
-            Message::Binary(bytes) => {
-                if let Ok(text) = String::from_utf8(bytes.to_vec()) {
-                    handle_mcp_message(&state, &text).await?;
-                }
-            }
-            Message::Close(_) => break,
-            _ => {}
-        }
-    }
-
+    let read_result = match reader.await {
+        Ok(result) => result,
+        Err(err) => Err(err.to_string()),
+    };
     writer.abort();
+    cleanup_mcp_connection(&state, generation).await;
+    read_result
+}
+
+async fn cleanup_mcp_connection(state: &AppState, generation: u64) {
     let mut bridge = state.bridge.lock().await;
+    if bridge.generation != generation {
+        return;
+    }
     bridge.connected = false;
     bridge.ready = false;
     bridge.sender = None;
@@ -244,7 +286,6 @@ async fn handle_mcp_socket(socket: WebSocket, state: AppState) -> Result<(), Str
     for (_, pending) in bridge.pending.drain() {
         let _ = pending.send(Err("Roblox Studio disconnected".into()));
     }
-    Ok(())
 }
 
 async fn handle_mcp_message(state: &AppState, text: &str) -> Result<(), String> {
@@ -385,7 +426,10 @@ async fn api_health(State(state): State<AppState>) -> impl IntoResponse {
         "toolsLoaded": bridge.tools.len(),
         "pluginConnected": plugin_connected(&plugin),
         "pluginEvents": plugin.events.len(),
-        "uptime": bridge.connected_at.map(|t| t.elapsed().as_secs()).unwrap_or(0)
+        "uptime": state.started_at.elapsed().as_secs(),
+        "studioUptime": bridge.connected_at.map(|t| t.elapsed().as_secs()).unwrap_or(0),
+        "version": env!("CARGO_PKG_VERSION"),
+        "pid": std::process::id()
     }))
 }
 
@@ -703,13 +747,17 @@ async fn plugin_register(
         .session_id
         .unwrap_or_else(|| format!("rs-{}", now_ms()));
     let mut plugin = state.plugin.lock().await;
-    plugin.session = Some(PluginSession {
-        id: id.clone(),
-        created_at: now_ms(),
-        last_seen_at: now_ms(),
-        commands: VecDeque::new(),
-        pending: HashMap::new(),
-    });
+    if let Some(session) = plugin.session.as_mut().filter(|session| session.id == id) {
+        session.last_seen_at = now_ms();
+    } else {
+        plugin.session = Some(PluginSession {
+            id: id.clone(),
+            created_at: now_ms(),
+            last_seen_at: now_ms(),
+            commands: VecDeque::new(),
+            pending: HashMap::new(),
+        });
+    }
     ok(json!({
         "ok": true,
         "sessionId": id,
@@ -752,6 +800,7 @@ async fn plugin_report(
         session.last_seen_at = now_ms();
         resolve_plugin_responses(session, responses_to_resolve);
     }
+    let mut context_events = Vec::new();
     for event in events_to_record {
         plugin.next_event_id += 1;
         let mut recorded = event;
@@ -759,9 +808,12 @@ async fn plugin_report(
             obj.insert("id".into(), Value::from(plugin.next_event_id));
             obj.insert("time".into(), Value::from(now_ms() as u64));
         }
-        plugin.events.push_back(recorded);
-        while plugin.events.len() > 200 {
-            plugin.events.pop_front();
+        context_events.push(recorded.clone());
+        if recorded.get("type").and_then(Value::as_str) != Some("context_snapshot") {
+            plugin.events.push_back(recorded);
+            while plugin.events.len() > 200 {
+                plugin.events.pop_front();
+            }
         }
     }
     let commands = plugin
@@ -769,6 +821,10 @@ async fn plugin_report(
         .as_mut()
         .map(|s| s.commands.drain(..).collect::<Vec<_>>())
         .unwrap_or_default();
+    drop(plugin);
+    for event in context_events {
+        ingest_studio_event(&state, event).await;
+    }
     ok(json!({ "ok": true, "commands": commands }))
 }
 
@@ -883,6 +939,83 @@ async fn record_operation(
     }
 }
 
+async fn ingest_studio_event(state: &AppState, event: Value) {
+    let event_type = event
+        .get("type")
+        .and_then(Value::as_str)
+        .unwrap_or("unknown")
+        .to_string();
+    let mut context = state.context.lock().await;
+    *context
+        .studio_event_counts
+        .entry(event_type.clone())
+        .or_insert(0) += 1;
+
+    if event_type == "context_snapshot" {
+        if let Some(snapshot) = event.get("snapshot") {
+            context.studio = snapshot.clone();
+            context.current_datamodel = snapshot
+                .get("mode")
+                .and_then(Value::as_str)
+                .map(str::to_string);
+        }
+    } else {
+        if !context.studio.is_object() {
+            context.studio = json!({});
+        }
+        let studio = context.studio.as_object_mut().expect("studio object");
+        match event_type.as_str() {
+            "selection_changed" => {
+                studio.insert(
+                    "selectionPaths".into(),
+                    event.get("paths").cloned().unwrap_or_else(|| json!([])),
+                );
+            }
+            "active_script_changed" => {
+                studio.insert(
+                    "activeScriptPath".into(),
+                    event.get("path").cloned().unwrap_or(Value::Null),
+                );
+            }
+            "mode_changed" => {
+                let mode = event.get("mode").cloned().unwrap_or(Value::Null);
+                studio.insert("mode".into(), mode.clone());
+                context.current_datamodel = mode.as_str().map(str::to_string);
+            }
+            "hierarchy_changed" => {
+                studio.insert("lastHierarchyChange".into(), event.clone());
+            }
+            "history" => {
+                studio.insert("lastHistoryCommit".into(), event.clone());
+            }
+            _ => {}
+        }
+    }
+
+    if event_type == "source_changed" {
+        if let Some(path) = event.get("path").and_then(Value::as_str) {
+            context.recent_scripts.retain(|entry| entry != path);
+            context.recent_scripts.push_front(path.to_string());
+            while context.recent_scripts.len() > 32 {
+                context.recent_scripts.pop_back();
+            }
+        }
+    }
+    if event_type == "output" && event.get("level").and_then(Value::as_str) == Some("MessageError")
+    {
+        context.recent_studio_errors.push_front(event.clone());
+        while context.recent_studio_errors.len() > 20 {
+            context.recent_studio_errors.pop_back();
+        }
+    }
+    if event_type != "context_snapshot" {
+        context.recent_studio_events.push_front(event);
+        while context.recent_studio_events.len() > 32 {
+            context.recent_studio_events.pop_back();
+        }
+    }
+}
+
 async fn context_snapshot(state: &AppState) -> Value {
     let context = state.context.lock().await;
     context_to_json(&context)
@@ -895,6 +1028,10 @@ fn context_to_json(context: &ContextState) -> Value {
         "currentDatamodel": context.current_datamodel,
         "recentScripts": context.recent_scripts,
         "recentOperations": context.recent_operations,
+        "studio": context.studio,
+        "studioEventCounts": context.studio_event_counts,
+        "recentStudioEvents": context.recent_studio_events,
+        "recentStudioErrors": context.recent_studio_errors,
     })
 }
 

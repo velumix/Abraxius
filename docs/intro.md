@@ -1,36 +1,52 @@
 # Introduction
 
-Abraxius is a background MCP bridge and CLI for Roblox Studio. It replaces the need for `StudioMCP.exe` by listening on the same WebSocket endpoint Roblox Studio already connects to (`ws://localhost:13469/studio`) and exposing a local HTTP API on `localhost:13470`.
+Abraxius is a Windows-hosted Roblox Studio companion and script-sync system. A
+packaged WinUI 3 app keeps the Rust daemon active, exposes a local HTTP API, and
+supervises the Studio companion connection.
 
 ## What it does
 
-- **Bridge**: Maintains a persistent WebSocket connection to Roblox Studio and performs the MCP client handshake.
-- **HTTP API**: Serves tools, state, Luau execution, and logging endpoints over HTTP so any language can talk to Studio.
-- **CLI**: Provides a terminal interface for starting the bridge, calling tools, executing Luau, and syncing scripts.
-- **AI Context**: Produces one AI-readable briefing with pinned project memory, recent operations, pending pushes, and Studio companion events.
-- **Sync**: Pulls scripts from Studio into a local project and pushes local edits back with Abraxius' focused, two-way script sync workflow.
-- **Studio Companion Plugin**: A second HTTP channel on `localhost:13471` gives Abraxius live Studio state (selection, source changes, play mode) and makes Draft Mode pushes trackable.
+- **Windows app**: Runs in the taskbar and notification area, follows the system
+  theme, starts the Rust daemon, and can launch with Windows.
+- **Studio companion**: Inspects instances, reads script sources, exports the
+  open place, reports activity, and applies verified updates to existing scripts.
+- **Script sync**: Maps Roblox services and scripts to `place.json` plus familiar
+  `.luau`, `.server.luau`, and `.client.luau` files.
+- **HTTP API and CLIs**: Expose daemon health, companion commands, AI context,
+  memory, sync, and optional MCP calls to local tools.
+- **Codex skill**: Provides a guarded pull, edit, push, and read-back workflow.
 
 ## Architecture
 
+```text
+Abraxius.App (WinUI 3)
+        |
+        +-- supervises --> abraxius-daemon.exe
+                              |
+node cli.js / abraxius.exe --HTTP--> 127.0.0.1:13470
+                              |
+                              +-- companion long-poll --> Studio plugin :13471
+                              |
+                              +-- legacy MCP listener --> ws://127.0.0.1:13469/studio
 ```
-node cli.js  --HTTP-->  node server.js  --WebSocket-->  Roblox Studio
-                        (localhost:13470)             (localhost:13469)
-                        |
-                        +--HTTP--> AbraxiusCompanion plugin
-                                  (localhost:13471)
-```
+
+The companion path is the reliable path for full-place pull, live inspection,
+source read-back, and updates to existing scripts. The legacy MCP listener
+remains available, but current Roblox releases use `StudioMCP.exe` over stdio
+and require a future transport integration for generic MCP tools.
 
 ## Quick start
 
-```bash
+```powershell
 npm install
-node cli.js start
-node cli.js pull ./my-game
-node cli.js remember "MatchManager owns round flow." --tag architecture --path ServerScriptService.MatchManager
-node cli.js ai-context
-node cli.js tools
-node cli.js state
+npm run rust:build
+npm run install-plugin
+npm run app:run
+
+node cli.js plugin status
+node cli.js pull game
+node cli.js push game\src\ServerScriptService\KnitServer.server.luau
 ```
 
-Roblox Studio must be open with MCP enabled in Assistant Settings.
+See [Windows App](windows-app.md), [Sync Workflow](sync.md), and
+[Codex Skill](codex-skill.md) for the complete workflows.

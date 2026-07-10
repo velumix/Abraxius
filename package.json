@@ -15,9 +15,11 @@
     "docs:build": "moonwave build --fresh --code .moonwave/stub",
     "smoke": "node scripts/smoke.js",
     "rust:check": "cargo check --manifest-path rust/abraxius-rs/Cargo.toml",
-    "rust:build": "cargo build --manifest-path rust/abraxius-rs/Cargo.toml",
-    "rust:run": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-rs --",
+    "rust:build": "cargo build --release --manifest-path rust/abraxius-rs/Cargo.toml",
+    "rust:run": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius --",
     "rust:daemon": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-daemon",
+    "app:build": "npm run rust:build && dotnet build app/Abraxius.App/Abraxius.App.csproj -c Release -p:Platform=x64",
+    "app:run": "dotnet run --project app/Abraxius.App/Abraxius.App.csproj -c Release -p:Platform=x64",
     "install-plugin": "node scripts/install-plugin.js",
     "plugin": "node scripts/install-plugin.js"
   },
@@ -32,7 +34,7 @@
     "ai-context",
     "roblox-studio"
   ],
-  "author": "",
+  "author": "Velumix",
   "license": "MIT",
   "dependencies": {
     "ws": "^8.18.0"

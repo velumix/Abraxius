@@ -4,7 +4,9 @@ version = "0.1.0"
 edition = "2024"
 description = "Rust control binary for Abraxius MCP, AI context, and Studio companion workflows"
 license = "MIT"
-default-run = "abraxius-rs"
+authors = ["Velumix"]
+default-run = "abraxius"
+autobins = false
 
 [dependencies]
 axum = { version = "0.8", features = ["ws"] }
@@ -14,7 +16,7 @@ serde_json = "1"
 tokio = { version = "1", features = ["full"] }
 
 [[bin]]
-name = "abraxius-rs"
+name = "abraxius"
 path = "src/main.rs"
 
 [[bin]]

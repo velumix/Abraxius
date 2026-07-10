@@ -12,6 +12,8 @@ const {
 const { MCPContext } = require("../lib/context");
 const { PendingPushes, hashSource } = require("../lib/pending");
 const { PluginServer } = require("../lib/plugin-server");
+const { RobloxMCPBridge } = require("../bridge");
+const { Puller } = require("../lib/pull");
 
 function testContext() {
   const context = new MCPContext({ maxRecent: 2 });
@@ -25,6 +27,23 @@ function testContext() {
 
   context.record({ type: "call", target: "A", datamodel: "Edit", summary: "test" });
   assert.strictEqual(context.lastOperation("call").target, "A");
+
+  context.ingestStudioEvent({
+    type: "context_snapshot",
+    snapshot: { mode: "Edit", selection: [], activeScript: null },
+  });
+  context.ingestStudioEvent({
+    type: "source_changed",
+    path: "ReplicatedStorage.Test",
+    sourceHash: "abc123",
+  });
+  context.ingestStudioEvent({ type: "history", action: "undo", name: "Rename" });
+  context.ingestStudioEvent({ type: "output", level: "MessageError", message: "failed" });
+  const snapshot = context.toSnapshot();
+  assert.strictEqual(snapshot.studio.mode, "Edit");
+  assert.strictEqual(snapshot.studio.lastHistoryCommit.name, "Rename");
+  assert.strictEqual(snapshot.recentScripts[0], "ReplicatedStorage.Test");
+  assert.strictEqual(snapshot.recentStudioErrors.length, 1);
 }
 
 function testPendingPushes() {
@@ -78,9 +97,87 @@ function testAiContextMemory() {
   assert.strictEqual(cleared.notes.length, 0);
 }
 
-testContext();
-testPendingPushes();
-testPluginEvents();
-testAiContextMemory();
+async function postJson(port, route, body) {
+  return new Promise((resolve, reject) => {
+    const req = require("http").request({
+      hostname: "127.0.0.1",
+      port,
+      path: route,
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+    }, (res) => {
+      let data = "";
+      res.on("data", (chunk) => (data += chunk));
+      res.on("end", () => resolve(JSON.parse(data)));
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify(body));
+  });
+}
 
-console.log("Smoke tests passed");
+async function testOfflineStartupAndSessionRecovery() {
+  const bridge = new RobloxMCPBridge({ port: 0 });
+  await bridge.start();
+  assert.strictEqual(bridge.ready, false);
+  assert.ok(bridge.port > 0);
+  bridge.stop();
+
+  const plugin = new PluginServer({ port: 0 });
+  await plugin.start();
+  await postJson(plugin.port, "/plugin/register", { sessionId: "stable" });
+  const original = plugin.sessions.get("stable");
+  original.commandQueue.push({ id: "queued" });
+  await postJson(plugin.port, "/plugin/register", { sessionId: "stable" });
+  assert.strictEqual(plugin.sessions.get("stable"), original);
+  assert.strictEqual(original.commandQueue.length, 1);
+  plugin.stop();
+}
+
+async function testBulkPull() {
+  const outputDir = fs.mkdtempSync(path.join(os.tmpdir(), "abraxius-pull-"));
+  let calls = 0;
+  const client = {
+    async pluginCall(command) {
+      calls++;
+      assert.strictEqual(command.type, "export_scripts");
+      return {
+        ok: true,
+        result: {
+          ok: true,
+          scripts: [
+            {
+              path: "ServerScriptService.Main",
+              className: "Script",
+              source: "print('fast')",
+              hasChildren: false,
+              runContext: "Legacy",
+            },
+          ],
+        },
+      };
+    },
+  };
+  const result = await new Puller(client, { outputDir }).pull();
+  assert.strictEqual(calls, 1);
+  assert.strictEqual(result.stats.scripts, 1);
+  assert.strictEqual(
+    fs.readFileSync(path.join(outputDir, "src", "ServerScriptService", "Main.server.luau"), "utf8"),
+    "print('fast')",
+  );
+  assert.ok(fs.existsSync(path.join(outputDir, "place.json")));
+}
+
+async function main() {
+  testContext();
+  testPendingPushes();
+  testPluginEvents();
+  testAiContextMemory();
+  await testOfflineStartupAndSessionRecovery();
+  await testBulkPull();
+  console.log("Smoke tests passed");
+}
+
+main().catch((err) => {
+  console.error(err);
+  process.exitCode = 1;
+});

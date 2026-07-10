@@ -1,0 +1,4 @@
+interface:
+  display_name: "Abraxius Studio Sync"
+  short_description: "Pull and push Roblox Studio scripts safely"
+  default_prompt: "Use $abraxius-studio-sync to pull Roblox Studio scripts, make a scoped change, push it back, and verify the result."

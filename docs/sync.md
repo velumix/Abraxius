@@ -4,7 +4,9 @@ Abraxius can extract scripts from Studio into a local project and push local edi
 
 ## Pull
 
-`mcp pull <dir>` extracts scripts from the connected Studio instance. Discovery and reads run in parallel with a small rate limit so large places finish quickly without hammering Studio.
+`mcp pull <dir>` asks the Studio companion for one bulk script export, including
+source and `RunContext` metadata. If the companion is unavailable or outdated,
+it falls back to the parallel MCP crawler.
 
 ```bash
 # Pull everything
@@ -78,11 +80,19 @@ After editing a pulled script locally, push it back to Studio:
 mcp push game/src/ServerScriptService/MatchManager.server.luau
 ```
 
-This resolves the local file back to `game.ServerScriptService.MatchManager`, reads the current Studio source, and applies a `multi_edit` with your changes. If the file has not changed, nothing is sent.
+When the MCP transport is offline, Abraxius updates existing pulled scripts
+through the connected Studio companion and verifies the resulting source.
+Creating a brand-new script still requires the MCP transport.
+
+This resolves the local file back to `game.ServerScriptService.MatchManager`.
+With MCP connected, the pusher uses MCP edit tools. Otherwise it reads and
+updates the existing script through the companion, then reads it back and
+requires an exact source match before reporting success.
 
 ## Draft Mode verification
 
-When Roblox Studio is in Draft Mode, `mcp push` writes the script source but the change may not be visible in the live DataModel until you commit the draft in Studio. Abraxius tracks these pushes and verifies them through the companion plugin.
+MCP pushes may be tracked as pending when Roblox Studio uses Draft Mode. Direct
+companion fallback pushes are verified immediately through `read_source`.
 
 ```bash
 # Push changes
