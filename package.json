@@ -1,9 +1,10 @@
 {
   "name": "abraxius",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio",
   "main": "client.js",
   "bin": {
+    "abraxius": "./cli.js",
     "mcp": "./cli.js"
   },
   "scripts": {
@@ -14,6 +15,8 @@
     "docs:dev": "moonwave dev --code .moonwave/stub",
     "docs:build": "moonwave build --fresh --code .moonwave/stub",
     "smoke": "node scripts/smoke.js",
+    "test": "node --test test/*.test.js",
+    "plugin:build": "node scripts/build-plugin.js",
     "rust:check": "cargo check --manifest-path rust/abraxius-rs/Cargo.toml",
     "rust:build": "cargo build --release --manifest-path rust/abraxius-rs/Cargo.toml",
     "rust:run": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius --",
@@ -40,6 +43,7 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "monaco-editor": "^0.55.1",
     "moonwave": "^1.4.2"
   }
 }

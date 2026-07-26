@@ -4,24 +4,41 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     Title="Abraxius">
     <Window.SystemBackdrop>
-        <MicaBackdrop />
+        <DesktopAcrylicBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid>
+    <Grid x:Name="RootGrid" Background="Transparent" SizeChanged="RootGrid_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="AppTitleBar" Title="Abraxius" Subtitle="Roblox Studio bridge">
+        <TitleBar x:Name="AppTitleBar" Title="Abraxius" Subtitle="Roblox Studio workspace">
             <TitleBar.IconSource>
                 <ImageIconSource ImageSource="Assets/Logo.png" />
             </TitleBar.IconSource>
         </TitleBar>
 
-        <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto">
-            <Grid MaxWidth="820" Padding="32,24,32,32" HorizontalAlignment="Stretch">
+        <NavigationView Grid.Row="1" x:Name="CategoryNavigation" PaneDisplayMode="Auto" CompactPaneLength="48" OpenPaneLength="184" IsPaneToggleButtonVisible="True" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" SelectionChanged="CategoryNavigation_SelectionChanged">
+            <NavigationView.MenuItems>
+                <NavigationViewItem x:Name="OverviewNavigationItem" Content="Home" Tag="overview" IsSelected="True"><NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Activity" Tag="playtest"><NavigationViewItem.Icon><SymbolIcon Symbol="Play" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Intelligence" Tag="intelligence"><NavigationViewItem.Icon><SymbolIcon Symbol="View" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Sync" Tag="scripts"><NavigationViewItem.Icon><SymbolIcon Symbol="Sync" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Code" Tag="code"><NavigationViewItem.Icon><SymbolIcon Symbol="Edit" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="AI" Tag="ai"><NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Commands" Tag="commands"><NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Diagnostics" Tag="output"><NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon></NavigationViewItem>
+            </NavigationView.MenuItems>
+            <NavigationView.FooterMenuItems>
+                <NavigationViewItem Content="Settings" Tag="settings"><NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon></NavigationViewItem>
+            </NavigationView.FooterMenuItems>
+            <Grid>
+        <ScrollViewer x:Name="OverviewPage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+            <Grid Padding="32,24,32,32" HorizontalAlignment="Stretch">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -30,79 +47,405 @@
 
                 <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" />
 
-                <Grid Grid.Row="1" Margin="0,8,0,0" ColumnSpacing="12" RowSpacing="12">
+                <Grid Grid.Row="1" Margin="0,10,0,0" ColumnSpacing="16">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Spacing="3">
+                        <TextBlock Text="Studio workspace" Style="{ThemeResource PageTitleStyle}" />
+                        <TextBlock x:Name="DetailText" Text="Reading local host status..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
+                        <Button x:Name="RefreshButton" Click="RefreshButton_Click" Width="38" Height="38" Padding="0" AutomationProperties.Name="Refresh status" ToolTipService.ToolTip="Refresh status">
+                            <SymbolIcon Symbol="Refresh" />
+                        </Button>
+                        <Button x:Name="CopyStatusButton" Click="CopyStatusButton_Click" Width="38" Height="38" Padding="0" AutomationProperties.Name="Copy status" ToolTipService.ToolTip="Copy status summary">
+                            <SymbolIcon Symbol="Copy" />
+                        </Button>
+                        <Button x:Name="DataFolderButton" Click="DataFolderButton_Click" Width="38" Height="38" Padding="0" AutomationProperties.Name="Open data folder" ToolTipService.ToolTip="Open Abraxius data folder">
+                            <SymbolIcon Symbol="Folder" />
+                        </Button>
+                    </StackPanel>
+                </Grid>
+
+                <Grid x:Name="HomeStatusGrid" Grid.Row="2" Margin="0,18,0,0" ColumnSpacing="12" RowSpacing="12">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="SERVER" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <StackPanel Orientation="Horizontal" Spacing="9">
-                                <Ellipse x:Name="ServerDot" Width="9" Height="9" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
-                                <TextBlock x:Name="ServerStatus" Text="Checking" Style="{ThemeResource SubtitleTextBlockStyle}" />
+                    <Border x:Name="ServerStatusCard" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <Border Width="38" Height="38" CornerRadius="8" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}">
+                                <FontIcon Glyph="&#xE968;" FontSize="17" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="SERVER" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="ServerDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="ServerStatus" Text="Checking" FontSize="17" FontWeight="SemiBold" />
+                                </StackPanel>
+                                <TextBlock Text="Local API :13470" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                             </StackPanel>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="StudioStatusCard" Grid.Column="1" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <Border Width="38" Height="38" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <FontIcon Glyph="&#xE774;" FontSize="17" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="STUDIO LINK" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="StudioDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="StudioStatus" Text="Checking" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Text="Advanced tool connection" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                            <Button x:Name="ForceMcpButton" Grid.Column="2" Width="34" Height="34" Padding="0" VerticalAlignment="Center" Click="ForceMcpButton_Click" AutomationProperties.Name="Force MCP connection" ToolTipService.ToolTip="Release port 13469 and reconnect MCP">
+                                <SymbolIcon Symbol="Sync" />
+                            </Button>
+                        </Grid>
+                    </Border>
+
+                    <Border x:Name="PluginStatusCard" Grid.Column="2" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                        <Grid ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Width="38" Height="38" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
+                                <FontIcon Glyph="&#xE8D4;" FontSize="17" />
+                            </Border>
+                            <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
+                                <TextBlock Text="STUDIO SYNC" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="PluginDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="PluginStatus" Text="Checking" FontSize="17" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                </StackPanel>
+                                <TextBlock Text="Script inspection and sync" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+
+                <Grid x:Name="HomeControlsGrid" Grid.Row="3" Margin="0,14,0,0" ColumnSpacing="14" RowSpacing="14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.1*" />
+                        <ColumnDefinition Width="0.9*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border x:Name="ServerControlsCard" Padding="18" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                        <StackPanel Spacing="14">
+                            <Grid>
+                                <TextBlock Text="Server controls" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="RUST HOST" HorizontalAlignment="Right" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                            </Grid>
+                            <StackPanel Orientation="Horizontal" Spacing="8">
+                                <Button x:Name="StartButton" Click="StartButton_Click" Style="{ThemeResource AccentButtonStyle}">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <SymbolIcon Symbol="Play" />
+                                        <TextBlock x:Name="StartButtonText" Text="Start server" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="StopButton" Click="StopButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <SymbolIcon Symbol="Stop" />
+                                        <TextBlock Text="Stop" />
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="LogsButton" Click="LogsButton_Click">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <SymbolIcon Symbol="Document" />
+                                        <TextBlock Text="Logs" />
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal" Spacing="10">
+                                <Button x:Name="InstallPluginButton" Click="InstallPluginButton_Click" ToolTipService.ToolTip="Install or update the Abraxius companion in Roblox Studio">
+                                    <StackPanel Orientation="Horizontal" Spacing="8">
+                                        <SymbolIcon Symbol="Download" />
+                                        <TextBlock x:Name="PluginInstallButtonText" Text="Install Roblox plugin" />
+                                    </StackPanel>
+                                </Button>
+                                <TextBlock x:Name="PluginInstallStatusText" Text="Ready to install" VerticalAlignment="Center" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                            <Grid ColumnSpacing="18" RowSpacing="10">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <StackPanel Spacing="2">
+                                    <TextBlock Text="API endpoint" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock Text="127.0.0.1:13470" FontFamily="Consolas" />
+                                </StackPanel>
+                                <StackPanel Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="Sync transport" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock x:Name="TransportText" Text="Checking" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Spacing="2">
+                                    <TextBlock Text="MCP tools" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock x:Name="ToolsLoadedText" Text="--" />
+                                </StackPanel>
+                                <StackPanel Grid.Row="1" Grid.Column="1" Spacing="2">
+                                    <TextBlock Text="Last refresh" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <TextBlock x:Name="LastCheckedText" Text="--" />
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
                     </Border>
 
-                    <Border Grid.Column="1" Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="ROBLOX STUDIO" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <StackPanel Orientation="Horizontal" Spacing="9">
-                                <Ellipse x:Name="StudioDot" Width="9" Height="9" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
-                                <TextBlock x:Name="StudioStatus" Text="Checking" Style="{ThemeResource SubtitleTextBlockStyle}" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
-                        </StackPanel>
-                    </Border>
-
-                    <Border Grid.Column="2" Padding="18" CornerRadius="8" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1">
-                        <StackPanel Spacing="8">
-                            <TextBlock Text="COMPANION" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                            <StackPanel Orientation="Horizontal" Spacing="9">
-                                <Ellipse x:Name="PluginDot" Width="9" Height="9" Fill="{ThemeResource SystemFillColorCautionBrush}" VerticalAlignment="Center" />
-                                <TextBlock x:Name="PluginStatus" Text="Checking" Style="{ThemeResource SubtitleTextBlockStyle}" TextTrimming="CharacterEllipsis" />
-                            </StackPanel>
+                    <Border x:Name="RuntimeCard" Grid.Column="1" Padding="18" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                        <StackPanel Spacing="13">
+                            <TextBlock Text="Runtime" FontSize="16" FontWeight="SemiBold" />
+                            <Grid RowSpacing="11" ColumnSpacing="16">
+                                <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <TextBlock Text="Version" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="HostVersionText" Grid.Column="1" Text="--" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Row="1" Text="Process ID" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="ProcessIdText" Grid.Row="1" Grid.Column="1" Text="--" HorizontalAlignment="Right" FontFamily="Consolas" />
+                                <TextBlock Grid.Row="2" Text="Uptime" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="UptimeText" Grid.Row="2" Grid.Column="1" Text="--" HorizontalAlignment="Right" />
+                                <TextBlock Grid.Row="3" Text="Supervision" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="SupervisionStatusText" Grid.Row="3" Grid.Column="1" Text="Enabled" HorizontalAlignment="Right" />
+                            </Grid>
+                            <InfoBar x:Name="ConnectionInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Companion sync available" Message="Pull and existing-script push work without legacy MCP." />
                         </StackPanel>
                     </Border>
                 </Grid>
 
-                <Grid Grid.Row="2" Margin="0,24,0,0">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-                    <TextBlock x:Name="DetailText" Text="Reading local host status..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <StackPanel Grid.Row="1" Margin="0,18,0,0" Orientation="Horizontal" Spacing="10">
-                        <Button x:Name="StartButton" Click="StartButton_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Play" />
-                                <TextBlock x:Name="StartButtonText" Text="Start server" />
+                <Border Grid.Row="4" Margin="0,14,0,0" Padding="18" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                    <StackPanel Spacing="13">
+                        <Grid>
+                            <StackPanel Spacing="2">
+                                <TextBlock Text="Live analytics" FontSize="16" FontWeight="SemiBold" />
+                                <TextBlock Text="Studio probe and Windows process telemetry" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
-                        </Button>
-                        <Button x:Name="StopButton" Click="StopButton_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Stop" />
-                                <TextBlock Text="Stop server" />
+                            <StackPanel HorizontalAlignment="Right" VerticalAlignment="Center" Orientation="Horizontal" Spacing="7">
+                                <Ellipse x:Name="AnalyticsDot" Width="7" Height="7" Fill="{ThemeResource SystemFillColorNeutralBrush}" />
+                                <TextBlock x:Name="AnalyticsFreshnessText" Text="Waiting on :13472" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
-                        </Button>
-                        <Button x:Name="LogsButton" Click="LogsButton_Click">
-                            <StackPanel Orientation="Horizontal" Spacing="8">
-                                <SymbolIcon Symbol="Document" />
-                                <TextBlock Text="Open logs" />
+                        </Grid>
+                        <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                        <Grid ColumnSpacing="24">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="6">
+                                <TextBlock Text="STUDIO PROBE" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <TextBlock x:Name="StudioMemoryText" Text="Memory  --" />
+                                <TextBlock x:Name="StudioRoleText" Text="Role  --" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="StudioPhysicsText" Text="Physics  --" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             </StackPanel>
-                        </Button>
+                            <StackPanel Grid.Column="1" Spacing="6">
+                                <TextBlock Text="WINDOWS PROCESSES" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <TextBlock x:Name="StudioResourcesText" Text="Studio  --" />
+                                <TextBlock x:Name="DaemonResourcesText" Text="Rust host  --" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="PlayerCountText" Text="Players  --" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="2" Spacing="6">
+                                <TextBlock Text="DATA MODEL" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
+                                <TextBlock x:Name="InstanceCountText" Text="Instances  --" />
+                                <TextBlock x:Name="ScriptCountText" Text="Scripts  --" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="PartCountText" Text="Parts  --" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </Grid>
                     </StackPanel>
-                </Grid>
+                </Border>
 
-                <StackPanel Grid.Row="3" Margin="0,30,0,0" Spacing="14">
-                    <TextBlock Text="Behavior" Style="{ThemeResource SubtitleTextBlockStyle}" />
-                    <ToggleSwitch x:Name="StartupToggle" Header="Start with Windows" Toggled="StartupToggle_Toggled" />
-                    <ToggleSwitch x:Name="SupervisionToggle" Header="Keep the Rust server running" IsOn="True" Toggled="SupervisionToggle_Toggled" />
-                    <TextBlock Text="Closing this window keeps Abraxius active in the notification area." Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                </StackPanel>
             </Grid>
         </ScrollViewer>
+
+                <Grid x:Name="PlaytestPage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                        <StackPanel Spacing="3">
+                            <TextBlock Text="Activity" Style="{ThemeResource PageTitleStyle}" />
+                            <TextBlock Text="Live playtest health, output, and runtime signals" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        </StackPanel>
+                        <Grid Grid.Row="1" ColumnSpacing="12">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                            <Border Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="SESSION" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestStateText" Text="Waiting" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="PlaytestDurationText" Text="--" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></Border>
+                            <Border Grid.Column="1" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="ERRORS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestErrorText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" /></StackPanel></Border>
+                            <Border Grid.Column="2" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="WARNINGS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestWarningText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCautionBrush}" /></StackPanel></Border>
+                            <Border Grid.Column="3" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="PRINTS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestPrintText" Text="0" FontSize="20" FontWeight="SemiBold" /></StackPanel></Border>
+                        </Grid>
+                        <Grid Grid.Row="2" ColumnSpacing="14">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*" /><ColumnDefinition Width="0.85*" /></Grid.ColumnDefinitions>
+                            <Border Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                                <Grid RowSpacing="10"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions><TextBlock Text="Recent runtime output" FontSize="16" FontWeight="SemiBold" /><ListView x:Name="PlaytestOutputList" Grid.Row="1" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><Grid Padding="2,6" ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="72" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding LevelLabel}" FontWeight="SemiBold" /><StackPanel Grid.Column="1" Spacing="2"><TextBlock Text="{Binding Message}" TextWrapping="Wrap" MaxLines="3" /><TextBlock Text="{Binding Location}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></Grid></DataTemplate></ListView.ItemTemplate></ListView></Grid>
+                            </Border>
+                            <Border Grid.Column="1" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="9"><TextBlock Text="Runtime probe" FontSize="16" FontWeight="SemiBold" /><TextBlock x:Name="PlaytestMemoryText" Text="Memory  --" /><TextBlock x:Name="PlaytestPlayersText" Text="Players  --" /><TextBlock x:Name="PlaytestPhysicsText" Text="Physics  --" /><TextBlock x:Name="PlaytestSceneText" Text="Scene  --" TextWrapping="Wrap" /></StackPanel></Border>
+                        </Grid>
+                </Grid>
+
+                <Grid x:Name="IntelligencePage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid><StackPanel Spacing="3"><TextBlock Text="Studio intelligence" Style="{ThemeResource PageTitleStyle}" /><TextBlock Text="Correlated runtime signals and reviewable local suggestions" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel><StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><Ellipse x:Name="IntelligenceStatusDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorSuccessBrush}" /><TextBlock x:Name="IntelligenceStatusText" Text="Observing" /></StackPanel></Grid>
+                    <Grid x:Name="IntelligenceWorkspaceGrid" Grid.Row="1" ColumnSpacing="14"><Grid.ColumnDefinitions><ColumnDefinition x:Name="IntelligenceTimelineColumn" Width="0.8*" /><ColumnDefinition Width="1.2*" /><ColumnDefinition x:Name="IntelligenceSettingsColumn" Width="300" /></Grid.ColumnDefinitions>
+                        <Border Style="{ThemeResource SectionCardStyle}" Padding="14"><Grid RowSpacing="10"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions><TextBlock Text="Timeline" FontSize="18" FontWeight="SemiBold" /><ListView x:Name="IntelligenceTimelineList" Grid.Row="1" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="3,7" Spacing="2"><TextBlock Text="{Binding Title}" FontWeight="SemiBold" /><TextBlock Text="{Binding Detail}" TextWrapping="Wrap" MaxLines="3" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock Text="{Binding Time}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView></Grid></Border>
+                        <Border Grid.Column="1" Style="{ThemeResource SectionCardStyle}" Padding="14"><Grid RowSpacing="10"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><TextBlock Text="Suggestion inbox" FontSize="18" FontWeight="SemiBold" /><ListView x:Name="IntelligenceSuggestionList" Grid.Row="1" SelectionMode="Single"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="4,8" Spacing="3"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Title}" FontWeight="SemiBold" /><TextBlock Grid.Column="1" Text="{Binding Confidence}" Foreground="{ThemeResource BrandAccentBrush}" /></Grid><TextBlock Text="{Binding Evidence}" TextWrapping="Wrap" MaxLines="5" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock Text="{Binding Time}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView><StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8"><Button Click="DismissIntelligenceSuggestionButton_Click" Content="Dismiss" /><Button Click="SummarizeIntelligenceSuggestionButton_Click" Content="Classify locally" /><Button Click="EscalateIntelligenceSuggestionButton_Click" Content="Escalate to 7B" /></StackPanel></Grid></Border>
+                        <ScrollViewer Grid.Column="2" VerticalScrollBarVisibility="Auto"><StackPanel Spacing="12"><InfoBar IsOpen="True" IsClosable="False" Severity="Informational" Title="Observe mode" Message="Rules suggest; models summarize only when requested." /><Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Signals" FontSize="18" FontWeight="SemiBold" /><ToggleSwitch x:Name="IntelligenceErrorsToggle" Header="Errors and warnings" IsOn="True" /><ToggleSwitch x:Name="IntelligencePerformanceToggle" Header="Performance anomalies" IsOn="True" /><ToggleSwitch x:Name="IntelligenceChangesToggle" Header="Script and mode changes" IsOn="True" /><ToggleSwitch x:Name="IntelligenceQuietHoursToggle" Header="Quiet hours (10 PM–8 AM)" /></StackPanel></Border><Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Thresholds" FontSize="18" FontWeight="SemiBold" /><NumberBox x:Name="IntelligenceRepeatThreshold" Header="Repeated error count" Value="3" Minimum="2" Maximum="20" /><NumberBox x:Name="IntelligenceWarningThreshold" Header="Warning spike" Value="3" Minimum="1" Maximum="50" /><NumberBox x:Name="IntelligenceMemoryThreshold" Header="Memory increase (MB)" Value="100" Minimum="10" Maximum="2000" /><NumberBox x:Name="IntelligencePhysicsThreshold" Header="Low physics FPS" Value="45" Minimum="1" Maximum="60" /></StackPanel></Border><Button Click="ClearIntelligenceTimelineButton_Click" Content="Clear timeline" /></StackPanel></ScrollViewer>
+                    </Grid>
+                </Grid>
+
+                <Grid x:Name="CodePage" Visibility="Collapsed" Padding="24,18,24,24" RowSpacing="12">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="42" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid ColumnSpacing="16">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="3"><TextBlock Text="Code" Style="{ThemeResource PageTitleStyle}" /><TextBlock Text="Pull, edit, preview, and safely push Luau source to Studio." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                        <TextBlock x:Name="EditorDirtyText" Grid.Column="1" Text="No script loaded" VerticalAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                    <Grid Grid.Row="1" ColumnSpacing="10">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                        <TextBox x:Name="EditorScriptPathTextBox" Header="Studio script path" PlaceholderText="ServerScriptService.MyScript" />
+                        <Button Grid.Column="1" VerticalAlignment="Bottom" Click="PullEditorScriptButton_Click"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Download" /><TextBlock Text="Pull" /></StackPanel></Button>
+                        <Button x:Name="PreviewEditorChangesButton" Grid.Column="2" VerticalAlignment="Bottom" Click="PreviewEditorChangesButton_Click" IsEnabled="False" Content="Preview changes" />
+                        <Button x:Name="PushEditorChangesButton" Grid.Column="3" VerticalAlignment="Bottom" Style="{ThemeResource AccentButtonStyle}" Click="PushEditorChangesButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Upload" /><TextBlock Text="Push to Studio" /></StackPanel></Button>
+                    </Grid>
+                    <TabView x:Name="EditorTabs" Grid.Row="2" IsAddTabButtonVisible="False" TabCloseRequested="EditorTabs_TabCloseRequested" SelectionChanged="EditorTabs_SelectionChanged" />
+                    <Grid x:Name="CodeWorkspaceGrid" Grid.Row="3" ColumnSpacing="12">
+                        <Grid.ColumnDefinitions><ColumnDefinition x:Name="CodeExplorerColumn" Width="230" /><ColumnDefinition Width="*" /><ColumnDefinition x:Name="CodeInspectorColumn" Width="300" /></Grid.ColumnDefinitions>
+                        <Border x:Name="CodeExplorerPanel" Style="{ThemeResource SectionCardStyle}" Padding="12">
+                            <Grid RowSpacing="8"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><Grid ColumnSpacing="6"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="Studio scripts" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" /><Button Grid.Column="1" Width="34" Height="34" Padding="0" Click="RefreshScriptExplorerButton_Click" ToolTipService.ToolTip="Refresh scripts"><SymbolIcon Symbol="Refresh" /></Button></Grid><TextBox x:Name="ScriptExplorerSearchTextBox" Grid.Row="1" PlaceholderText="Filter scripts" TextChanged="ScriptExplorerSearchTextBox_TextChanged" /><ListView x:Name="ScriptExplorerList" Grid.Row="2" SelectionMode="Single"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="2,5"><TextBlock Text="{Binding Name}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" /><TextBlock Text="{Binding Service}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextTrimming="CharacterEllipsis" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView><Button Grid.Row="3" Click="OpenExplorerScriptButton_Click" Content="Open selected" /></Grid>
+                        </Border>
+                        <Border Grid.Column="1" CornerRadius="10" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1" Background="{ThemeResource GlassSurfaceStrongBrush}">
+                            <WebView2 x:Name="CodeEditorWebView" Loaded="CodeEditorWebView_Loaded" CoreWebView2Initialized="CodeEditorWebView_CoreWebView2Initialized" />
+                        </Border>
+                        <StackPanel x:Name="CodeInspectorPanel" Grid.Column="2" Spacing="12">
+                            <InfoBar x:Name="EditorInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Editor ready" Message="Enter a Studio script path and choose Pull." />
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="8"><TextBlock Text="Editor commands" FontSize="17" FontWeight="SemiBold" /><Grid RowSpacing="8" ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions><Button Click="EditorFindButton_Click" Content="Find / replace" /><Button Grid.Column="1" Click="EditorGoToLineButton_Click" Content="Go to line" /><Button Grid.Row="1" Click="EditorCommandPaletteButton_Click" Content="Command palette" /><Button Grid.Row="1" Grid.Column="1" Click="EditorFormatButton_Click" Content="Format document" /><Button Grid.Row="2" Grid.ColumnSpan="2" Click="EditorDiagnosticsButton_Click" Content="Run Luau diagnostics" /></Grid><TextBlock x:Name="EditorToolsStatusText" Text="Checking local editor tools…" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /></StackPanel></Border>
+                            <Border Style="{ThemeResource SectionCardStyle}">
+                                <StackPanel Spacing="8"><TextBlock Text="Source safety" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="EditorHashText" Text="Source hash  --" FontFamily="Consolas" TextWrapping="Wrap" /><TextBlock Text="Push uses the pulled hash for conflict detection, previews the Studio diff, and reads the committed source back before reporting success." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /></StackPanel>
+                            </Border>
+                            <Border Style="{ThemeResource SectionCardStyle}">
+                                <StackPanel Spacing="8"><TextBlock Text="Preview" FontSize="17" FontWeight="SemiBold" /><TextBox x:Name="EditorDiffTextBox" Text="No preview yet." IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="Wrap" MinHeight="220" ScrollViewer.VerticalScrollBarVisibility="Auto" /></StackPanel>
+                            </Border>
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="8"><TextBlock Text="Diagnostics" FontSize="17" FontWeight="SemiBold" /><TextBox x:Name="EditorDiagnosticsTextBox" Text="No diagnostics have run." IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="Wrap" MinHeight="130" ScrollViewer.VerticalScrollBarVisibility="Auto" /></StackPanel></Border>
+                        </StackPanel>
+                    </Grid>
+                </Grid>
+
+                <Grid x:Name="AiPage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Spacing="3"><TextBlock Text="AI workspace" Style="{ThemeResource PageTitleStyle}" /><TextBlock Text="Chat with an Ollama model using context you explicitly choose." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><Ellipse x:Name="AiProviderDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorNeutralBrush}" /><TextBlock x:Name="AiProviderStatusText" Text="Checking Ollama" /></StackPanel></Grid>
+                    <Grid x:Name="AiWorkspaceGrid" Grid.Row="1" ColumnSpacing="14" RowSpacing="14">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition x:Name="AiContextColumn" Width="320" /></Grid.ColumnDefinitions>
+                        <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <Border Style="{ThemeResource SectionCardStyle}" Padding="14">
+                            <Grid RowSpacing="10"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ComboBox x:Name="AiModelPicker" Header="Ollama model" PlaceholderText="Select a model" DisplayMemberPath="DisplayName" /><Button Grid.Column="1" VerticalAlignment="Bottom" Click="RefreshAiModelsButton_Click"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Refresh" /><TextBlock Text="Refresh" /></StackPanel></Button></Grid><TextBox x:Name="AiTranscriptTextBox" Grid.Row="1" Text="Abraxius AI is ready. Choose a model and send a message." IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" ScrollViewer.VerticalScrollBarVisibility="Auto" /></Grid>
+                        </Border>
+                        <Border Grid.Row="1" Style="{ThemeResource SectionCardStyle}" Padding="12">
+                            <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="AiPromptTextBox" PlaceholderText="Ask about the open place, editor source, or runtime output…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" /><Button x:Name="SendAiMessageButton" Grid.Column="1" VerticalAlignment="Center" Style="{ThemeResource AccentButtonStyle}" Click="SendAiMessageButton_Click" Content="Send" /><Button x:Name="CancelAiMessageButton" Grid.Column="2" VerticalAlignment="Center" Click="CancelAiMessageButton_Click" Content="Cancel" IsEnabled="False" /></Grid>
+                        </Border>
+                        <ScrollViewer x:Name="AiContextPanel" Grid.Column="1" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto"><StackPanel Spacing="12">
+                            <InfoBar x:Name="AiContextInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Context is local" Message="Abraxius sends only the enabled context sections to the selected Ollama model." />
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Project memory" FontSize="18" FontWeight="SemiBold" /><TextBlock x:Name="AiProjectIdentityText" Text="Resolving Studio project…" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBox x:Name="AiProjectInstructionsTextBox" Header="Project instructions" PlaceholderText="Architecture, conventions, safety rules…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" /><Button Click="SaveAiProjectInstructionsButton_Click" Content="Save instructions" /><TextBox x:Name="AiMemoryInputTextBox" Header="Pin memory" PlaceholderText="A durable project fact" /><Button Click="AddAiMemoryButton_Click" Content="Add memory" /><ListView x:Name="AiMemoryList" Height="130" SelectionMode="Single"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="2,5"><TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxLines="3" /><TextBlock Text="{Binding CreatedAt}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView><Button Click="DeleteAiMemoryButton_Click" Content="Delete selected memory" /></StackPanel></Border>
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="12"><TextBlock Text="Include context" FontSize="18" FontWeight="SemiBold" /><ToggleSwitch x:Name="AiStudioContextToggle" Header="Studio state and selection" IsOn="True" /><ToggleSwitch x:Name="AiEditorContextToggle" Header="Active editor source" IsOn="True" /><ToggleSwitch x:Name="AiRuntimeContextToggle" Header="Recent runtime output" IsOn="True" /><Button Click="PreviewAiContextButton_Click" Content="Preview context" /></StackPanel></Border>
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="8"><TextBlock Text="Session and handoff" FontSize="18" FontWeight="SemiBold" /><ToggleSwitch x:Name="AiLocalModelsOnlyToggle" Header="Local models only" IsOn="True" Toggled="AiLocalModelsOnlyToggle_Toggled" /><TextBlock x:Name="AiContextSizeText" Text="Context not built" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /><Button Click="DraftAiCommandPlanButton_Click" Content="Draft command plan" /><Button Click="GenerateAiBriefingButton_Click" Content="Generate compact briefing" /><Button Click="ExportAiProjectButton_Click" Content="Export memory and conversation" /><Button Click="CompactAiConversationButton_Click" Content="Compact conversation into memory" /><Button Click="ClearAiConversationButton_Click" Content="Clear conversation" /></StackPanel></Border>
+                        </StackPanel></ScrollViewer>
+                    </Grid>
+                </Grid>
+
+                <ScrollViewer x:Name="CommandsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <Grid x:Name="CommandsLayoutGrid" Padding="32,24,32,32" HorizontalAlignment="Stretch" ColumnSpacing="16" RowSpacing="16">
+                        <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="1.05*" /><ColumnDefinition Width="0.95*" /></Grid.ColumnDefinitions>
+                        <StackPanel Spacing="16">
+                            <StackPanel Spacing="4">
+                                <TextBlock Text="Commands" Style="{ThemeResource PageTitleStyle}" />
+                                <TextBlock Text="Inspect and operate Studio through the connected companion." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <InfoBar x:Name="CommandInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Discovering Studio commands" Message="Connect the Studio companion to load its command schemas." />
+                            <Border Style="{ThemeResource SectionCardStyle}">
+                                <StackPanel Spacing="14">
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="180" /></Grid.ColumnDefinitions>
+                                        <TextBox x:Name="CommandSearchTextBox" Header="Find commands" PlaceholderText="Search by name" TextChanged="CommandSearchTextBox_TextChanged" />
+                                        <ComboBox x:Name="CommandCategoryPicker" Grid.Column="1" Header="Category" SelectedIndex="0" SelectionChanged="CommandCategoryPicker_SelectionChanged"><ComboBoxItem Content="All commands" Tag="all" /><ComboBoxItem Content="Favorites" Tag="favorites" /><ComboBoxItem Content="Read and inspect" Tag="read" /><ComboBoxItem Content="Scripts" Tag="scripts" /><ComboBoxItem Content="Instances" Tag="instances" /><ComboBoxItem Content="Runtime" Tag="runtime" /></ComboBox>
+                                    </Grid>
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="CommandPicker" Header="Command" PlaceholderText="Select a command" IsTextSearchEnabled="True" SelectionChanged="CommandPicker_SelectionChanged" />
+                                        <Button x:Name="FavoriteCommandButton" Grid.Column="1" VerticalAlignment="Bottom" Click="FavoriteCommandButton_Click" IsEnabled="False" Content="☆ Favorite" />
+                                        <Button Grid.Column="2" VerticalAlignment="Bottom" Click="DiscoverCommandsButton_Click"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Refresh" /><TextBlock Text="Discover" /></StackPanel></Button>
+                                    </Grid>
+                                    <TextBlock x:Name="CommandSchemaText" Text="Select a command to inspect its schema." FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxHeight="150" />
+                                    <Expander Header="Structured arguments" IsExpanded="True"><StackPanel x:Name="StructuredArgumentsPanel" Spacing="10" Padding="0,8,0,4"><TextBlock Text="Select a command to generate argument controls." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Expander>
+                                    <TextBox x:Name="CommandArgumentsTextBox" Header="Arguments (JSON object)" Text="{}" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                    <Grid ColumnSpacing="10">
+                                        <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                        <ComboBox x:Name="CommandPresetPicker" Header="Saved preset" PlaceholderText="Choose a preset" SelectionChanged="CommandPresetPicker_SelectionChanged" />
+                                        <Button Grid.Column="1" VerticalAlignment="Bottom" Click="SaveCommandPresetButton_Click" Content="Save preset" />
+                                        <Button Grid.Column="2" VerticalAlignment="Bottom" Click="DeleteCommandPresetButton_Click" Content="Delete" />
+                                    </Grid>
+                                    <StackPanel Orientation="Horizontal" Spacing="10">
+                                        <Button x:Name="RunCommandButton" Style="{ThemeResource AccentButtonStyle}" Click="RunCommandButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Play" /><TextBlock Text="Run command" /></StackPanel></Button>
+                                        <Button x:Name="QueueCommandButton" Click="QueueCommandButton_Click" IsEnabled="False" Content="Add to queue" />
+                                        <ProgressRing x:Name="CommandProgress" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Border>
+                            <Border Style="{ThemeResource SectionCardStyle}">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Result" FontSize="18" FontWeight="SemiBold" />
+                                    <TextBox x:Name="CommandResultTextBox" Text="No command has run yet." IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="220" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                </StackPanel>
+                            </Border>
+                        </StackPanel>
+                        <Border x:Name="ApprovalQueuePanel" Grid.Column="1" Style="{ThemeResource SectionCardStyle}" Margin="0,66,0,0">
+                            <StackPanel Spacing="12">
+                                <Grid><StackPanel Spacing="2"><TextBlock Text="Approval queue" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Review commands before atomic or sequential execution" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" /></StackPanel><Button HorizontalAlignment="Right" VerticalAlignment="Center" Click="ClearApprovalQueueButton_Click" Content="Clear" /></Grid>
+                                <ListView x:Name="ApprovalQueueList" MinHeight="130" MaxHeight="200" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><Grid Padding="3,7"><Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Position}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><StackPanel Grid.Column="1"><TextBlock Text="{Binding Command}" FontWeight="SemiBold" /><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button x:Name="ExecuteApprovalQueueButton" Style="{ThemeResource AccentButtonStyle}" Click="ExecuteApprovalQueueButton_Click" IsEnabled="False" Content="Review and execute queue" /><Button Grid.Column="1" Click="SaveWorkflowButton_Click" Content="Save workflow" /></Grid>
+                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ComboBox x:Name="WorkflowPicker" Header="Saved workflow" PlaceholderText="Choose workflow" /><Button Grid.Column="1" VerticalAlignment="Bottom" Click="LoadWorkflowButton_Click" Content="Load" /></Grid>
+                                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                                <Grid><StackPanel Spacing="2"><TextBlock Text="Command history" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Persistent redacted outcomes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" /></StackPanel><StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8"><ComboBox x:Name="HistoryRetentionPicker" Width="90" SelectedIndex="1" SelectionChanged="HistoryRetentionPicker_SelectionChanged"><ComboBoxItem Content="25" Tag="25" /><ComboBoxItem Content="100" Tag="100" /><ComboBoxItem Content="250" Tag="250" /></ComboBox><Button Click="ClearCommandHistoryButton_Click" Content="Clear" /></StackPanel></Grid>
+                                <ListView x:Name="CommandHistoryList" MinHeight="180" MaxHeight="300" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="3,8" Spacing="3"><Grid><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Command}" FontWeight="SemiBold" /><TextBlock Text="{Binding Time}" Grid.Column="1" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></Grid><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="3" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView>
+                            </StackPanel>
+                        </Border>
+                    </Grid>
+                </ScrollViewer>
+
+                <Grid x:Name="OutputPage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Grid><StackPanel Spacing="3"><TextBlock Text="Diagnostics" Style="{ThemeResource PageTitleStyle}" /><TextBlock Text="Inspect Studio output and troubleshoot the active connection" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel><StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8"><Button Click="ExportDiagnosticsButton_Click" AutomationProperties.Name="Create diagnostics bundle"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Save" /><TextBlock Text="Support bundle" /></StackPanel></Button><ComboBox x:Name="OutputFilter" Width="150" SelectedIndex="0" SelectionChanged="OutputFilter_SelectionChanged"><ComboBoxItem Content="All output" Tag="all" /><ComboBoxItem Content="Errors" Tag="error" /><ComboBoxItem Content="Warnings" Tag="warning" /><ComboBoxItem Content="Prints and info" Tag="print" /></ComboBox></StackPanel></Grid>
+                    <InfoBar x:Name="OutputSummaryBar" Grid.Row="1" IsOpen="True" IsClosable="False" Severity="Informational" Title="No output captured" Message="Start a playtest or print from Studio." />
+                    <Border Grid.Row="2" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><ListView x:Name="OutputList" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><Grid Padding="4,7" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="74" /><ColumnDefinition Width="72" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding TimeLabel}" FontFamily="Consolas" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><TextBlock Grid.Column="1" Text="{Binding LevelLabel}" FontWeight="SemiBold" /><StackPanel Grid.Column="2" Spacing="2"><TextBlock Text="{Binding Message}" TextWrapping="Wrap" /><TextBlock Text="{Binding Location}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></Grid></DataTemplate></ListView.ItemTemplate></ListView></Border>
+                </Grid>
+
+                <Grid x:Name="ScriptsPage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <StackPanel Spacing="3"><TextBlock Text="Sync" Style="{ThemeResource PageTitleStyle}" /><TextBlock Text="Track source changes reported by the Studio sync companion" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                    <Grid x:Name="SyncStatsGrid" Grid.Row="1" ColumnSpacing="12" RowSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><Border x:Name="WatchedScriptsCard" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel><TextBlock Text="WATCHED" Style="{ThemeResource CaptionTextBlockStyle}" /><TextBlock x:Name="WatchedScriptsText" Text="--" FontSize="20" FontWeight="SemiBold" /></StackPanel></Border><Border x:Name="RecentChangesCard" Grid.Column="1" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel><TextBlock Text="RECENT CHANGES" Style="{ThemeResource CaptionTextBlockStyle}" /><TextBlock x:Name="RecentScriptChangesText" Text="0" FontSize="20" FontWeight="SemiBold" /></StackPanel></Border><Border x:Name="ScriptModeCard" Grid.Column="2" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel><TextBlock Text="MODE" Style="{ThemeResource CaptionTextBlockStyle}" /><TextBlock x:Name="ScriptModeText" Text="--" FontSize="20" FontWeight="SemiBold" /></StackPanel></Border></Grid>
+                    <Border Grid.Row="2" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><ListView x:Name="ScriptActivityList" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><Grid Padding="4,7" ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="74" /><ColumnDefinition Width="*" /><ColumnDefinition Width="100" /></Grid.ColumnDefinitions><TextBlock Text="{Binding TimeLabel}" FontFamily="Consolas" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><TextBlock Grid.Column="1" Text="{Binding Path}" TextTrimming="CharacterEllipsis" /><TextBlock Grid.Column="2" Text="{Binding Detail}" HorizontalAlignment="Right" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></Grid></DataTemplate></ListView.ItemTemplate></ListView></Border>
+                </Grid>
+
+                <ScrollViewer x:Name="SettingsPage" Visibility="Collapsed" VerticalScrollBarVisibility="Auto">
+                    <StackPanel MaxWidth="1000" Padding="32,24,32,32" Spacing="18" HorizontalAlignment="Stretch">
+                        <StackPanel Spacing="4">
+                            <TextBlock Text="Settings" Style="{ThemeResource PageTitleStyle}" />
+                            <TextBlock Text="Control how Abraxius starts, supervises its host, and integrates with Studio." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Border Style="{ThemeResource SectionCardStyle}">
+                            <StackPanel Spacing="18">
+                                <StackPanel Spacing="3"><TextBlock Text="Background behavior" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Keep your local Studio bridge available without managing it manually." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                                <ToggleSwitch x:Name="StartupToggle" Header="Start Abraxius with Windows" OffContent="Launch manually" OnContent="Starts after sign-in" Toggled="StartupToggle_Toggled" />
+                                <ToggleSwitch x:Name="SupervisionToggle" Header="Keep the local host running" OffContent="Supervision paused" OnContent="Automatically recover" IsOn="True" Toggled="SupervisionToggle_Toggled" />
+                            </StackPanel>
+                        </Border>
+                        <Border Style="{ThemeResource SectionCardStyle}">
+                            <StackPanel Spacing="12">
+                                <TextBlock Text="Storage and support" FontSize="18" FontWeight="SemiBold" />
+                                <StackPanel Orientation="Horizontal" Spacing="10">
+                                    <Button Click="LogsButton_Click"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Document" /><TextBlock Text="Open logs" /></StackPanel></Button>
+                                    <Button Click="DataFolderButton_Click"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Folder" /><TextBlock Text="Open data folder" /></StackPanel></Button>
+                                    <Button Click="ExportDiagnosticsButton_Click"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Save" /><TextBlock Text="Create support bundle" /></StackPanel></Button>
+                                </StackPanel>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+            </Grid>
+        </NavigationView>
     </Grid>
 </Window>

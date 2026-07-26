@@ -1,12 +1,12 @@
 #!/usr/bin/env node
-const { spawn } = require("child_process");
 const path = require("path");
 const fs = require("fs");
 const { MCPClient } = require("./client");
 const logger = require("./lib/logger");
-const { isRunning, PID_FILE, API_PORT } = require("./server");
 const { Puller } = require("./lib/pull");
 const { Pusher } = require("./lib/push");
+const { encodeAxlError, executePluginAxl, parseAxl } = require("./lib/axl");
+const { readJsonObjectArgument, readTextArgument } = require("./lib/cli-input");
 const {
   addMemory,
   buildAiContext,
@@ -15,24 +15,43 @@ const {
   toMarkdown,
 } = require("./lib/ai-context");
 
+const studioEmoji = {
+  tools: String.fromCodePoint(0x1f9f0),
+  state: String.fromCodePoint(0x1f4ca),
+  call: String.fromCodePoint(0x26a1),
+  smart: String.fromCodePoint(0x1f9e0),
+  execute: String.fromCodePoint(0x25b6, 0xfe0f),
+  edit: String.fromCodePoint(0x270f, 0xfe0f),
+  batch: String.fromCodePoint(0x1f4e6),
+  replace: String.fromCodePoint(0x1f501),
+  search: String.fromCodePoint(0x1f50d),
+  pull: String.fromCodePoint(0x1f4e5),
+  push: String.fromCodePoint(0x1f680),
+  repl: String.fromCodePoint(0x1f3ae),
+};
+
+const studioLog = (icon, message) => `${icon} ${message}`;
+
 const USAGE = `
 Usage: mcp <command> [args]
 
-Daemon:
-  start                 Start the MCP bridge daemon in the background
-  stop                  Stop the daemon
-  status                Check if the daemon is running
-  logs                  Tail the daemon log file
+App host:
+  start                 Confirm the Abraxius App host is running
+  stop                  Explain how to stop the host from the app
+  status                Check the app-supervised host and Studio connections
+  logs                  Tail the app-supervised host log
 
 Queries:
+  axl <command>         Run one AXL/1 command. Supports --file, --stdin, or
+                        --ast for parser/debug JSON without execution.
   tools                 List available Roblox Studio tools
   state                 Get current studio state
-  call <name> [json]    Call a tool, e.g.:
+  call <name> [json]    Call a tool. JSON can also use --json-file or --json-stdin.
                           mcp call get_studio_state
                           mcp call search_game_tree '{"path":"Workspace","max_depth":2}'
                           mcp call multi_edit '{"file_path":"...","edits":[...]}'
   smart <name> [json]   Context-aware tool call (auto datamodel, records history)
-  execute <code>        Execute Luau code, e.g.:
+  execute <code>        Execute Luau code. Also supports --file or --stdin, e.g.:
                           mcp execute 'print(game.Workspace)'
   repl                  Interactive tool-calling REPL
 
@@ -64,7 +83,7 @@ Plugin:
   plugin select <paths> Select one or more Studio instances
   plugin open <path> [line]
                         Open a Studio script at a line
-  plugin call <type> [json]
+  plugin call <type> [json|--json-file <file>|--json-stdin]
                         Send a raw command to the Studio companion plugin
   pending               List pending pushes (Draft Mode tracking)
   pending verify        Ask the plugin which pushes are still stale
@@ -78,7 +97,7 @@ Sync:
                           mcp pull --target ServerScriptService.MatchManager
   pull --targets-file <file> [dir]
                         Pull a list of Studio paths from a file (one per line).
-  push <file>           Push a local script file back to Studio using multi_edit.
+  push <file>           Push a local script or .rbxm/.rbxmx model to Studio.
                         Uses the companion when MCP is offline. Requires the
                         file to be inside a place.json project.
 `;
@@ -121,27 +140,6 @@ function parseOptions(argv) {
   return out;
 }
 
-function ensureDaemon() {
-  if (isRunning()) return;
-  logger.startupBanner("matrix");
-  logger.info("Starting MCP daemon...");
-  const log = fs.openSync(
-    path.join(require("os").tmpdir(), "abraxius.log"),
-    "a",
-  );
-  const proc = spawn(
-    process.execPath,
-    [path.join(__dirname, "server.js"), "--daemon"],
-    {
-      detached: true,
-      stdio: ["ignore", log, log],
-      windowsHide: true,
-    },
-  );
-  proc.unref();
-  fs.writeFileSync(PID_FILE, String(proc.pid));
-}
-
 async function waitForReady(timeoutMs = 20000) {
   const client = new MCPClient();
   const start = Date.now();
@@ -157,19 +155,6 @@ async function waitForReady(timeoutMs = 20000) {
   );
 }
 
-async function waitForDaemon(timeoutMs = 5000) {
-  const client = new MCPClient();
-  const start = Date.now();
-  while (Date.now() - start < timeoutMs) {
-    try {
-      const health = await client.health();
-      if (health.running) return health;
-    } catch {}
-    await new Promise((r) => setTimeout(r, 100));
-  }
-  throw new Error(`Daemon did not open its API within ${timeoutMs}ms. Check: mcp logs`);
-}
-
 async function probeDaemon() {
   try {
     const health = await new MCPClient().health();
@@ -180,7 +165,11 @@ async function probeDaemon() {
 }
 
 async function withClient(fn) {
-  if (!(await probeDaemon())) ensureDaemon();
+  if (!(await probeDaemon())) {
+    throw new Error(
+      "Abraxius App host is offline. Launch Abraxius from Windows; the CLI does not start a separate daemon.",
+    );
+  }
   const health = await waitForReady();
   if (!health.connected) {
     throw new Error(
@@ -192,8 +181,11 @@ async function withClient(fn) {
 }
 
 async function withDaemonClient(fn) {
-  if (!(await probeDaemon())) ensureDaemon();
-  await waitForDaemon();
+  if (!(await probeDaemon())) {
+    throw new Error(
+      "Abraxius App host is offline. Launch Abraxius from Windows; the CLI does not start a separate daemon.",
+    );
+  }
   return fn(new MCPClient());
 }
 
@@ -203,29 +195,14 @@ async function main() {
   try {
     switch (command) {
       case "start":
-        if (await probeDaemon()) {
-          logger.warn("Daemon already running");
-        } else {
-          ensureDaemon();
-          const health = await waitForDaemon();
-          logger.success("Daemon started");
-          if (health.connected) {
-            logger.success("Studio connected");
-            logger.studio(JSON.stringify(health.studio));
-          } else {
-            logger.info("Studio is not connected yet; the daemon will keep listening");
-          }
-        }
+        if (await probeDaemon()) logger.success("Abraxius App host is running");
+        else throw new Error("Launch Abraxius from Windows. Host lifecycle belongs to the app.");
         break;
 
       case "stop": {
-        if (!(await probeDaemon())) {
-          logger.warn("Daemon not running");
-          return;
-        }
-        const client = new MCPClient();
-        await client.shutdown();
-        logger.success("Daemon stopped");
+        throw new Error(
+          "Stop or quit Abraxius from its window or tray menu. The CLI cannot stop the app-owned host.",
+        );
         break;
       }
 
@@ -264,7 +241,7 @@ async function main() {
 
       case "tools": {
         const result = await withClient(async (c) => {
-          logger.cli("tools"); await c.log("🧰 tools");
+          logger.cli("tools"); await c.log(studioLog(studioEmoji.tools, "List tools"));
           return c.tools();
         });
         console.log(JSON.stringify(result.tools, null, 2));
@@ -273,7 +250,7 @@ async function main() {
 
       case "state": {
         const result = await withClient(async (c) => {
-          logger.cli("state"); await c.log("📊 state");
+          logger.cli("state"); await c.log(studioLog(studioEmoji.state, "Read Studio state"));
           return c.state();
         });
         console.log(JSON.stringify(result, null, 2));
@@ -281,32 +258,33 @@ async function main() {
       }
 
       case "call": {
-        const [name, json] = args;
+        const [name, ...inputArgs] = args;
         if (!name) throw new Error("Tool name required");
+        const toolArguments = await readJsonObjectArgument(inputArgs);
         const result = await withClient(async (c) => {
-          logger.cli("call", name); await c.log(`⚡ call ${name}`);
-          return c.call(name, parseJson(json));
+          logger.cli("call", name); await c.log(studioLog(studioEmoji.call, `Call ${name}`));
+          return c.call(name, toolArguments);
         });
         console.log(JSON.stringify(result, null, 2));
         break;
       }
 
       case "smart": {
-        const [name, json] = args;
+        const [name, ...inputArgs] = args;
         if (!name) throw new Error("Tool name required");
+        const toolArguments = await readJsonObjectArgument(inputArgs);
         const result = await withClient(async (c) => {
-          logger.cli("smart", name); await c.log(`🧠 smart ${name}`);
-          return c.smartCall(name, parseJson(json));
+          logger.cli("smart", name); await c.log(studioLog(studioEmoji.smart, `Smart call ${name}`));
+          return c.smartCall(name, toolArguments);
         });
         console.log(JSON.stringify(result, null, 2));
         break;
       }
 
       case "execute": {
-        const code = args.join(" ");
-        if (!code) throw new Error("Luau code required");
+        const code = await readTextArgument(args);
         const result = await withClient(async (c) => {
-          logger.cli("execute"); await c.log("▶️ execute");
+          logger.cli("execute"); await c.log(studioLog(studioEmoji.execute, "Execute Luau"));
           return c.execute(code);
         });
         console.log(JSON.stringify(result, null, 2));
@@ -336,7 +314,7 @@ async function main() {
       case "ai-context": {
         const opts = parseOptions(args);
         const projectDir = opts.projectDir || process.cwd();
-        if (isRunning()) {
+        if (await probeDaemon()) {
           try {
             const client = new MCPClient();
             const result = await client.aiContext({
@@ -349,6 +327,32 @@ async function main() {
         }
         const snapshot = buildAiContext({ projectDir });
         console.log(opts.json ? JSON.stringify(snapshot, null, 2) : toMarkdown(snapshot));
+        break;
+      }
+
+      case "axl": {
+        const astOnly = args.includes("--ast");
+        const inputArgs = args.filter((arg) => arg !== "--ast");
+        const source = await readTextArgument(inputArgs);
+        let ast;
+        try {
+          ast = parseAxl(source);
+        } catch (error) {
+          console.error(encodeAxlError(error));
+          process.exitCode = 1;
+          break;
+        }
+        if (astOnly) {
+          console.log(JSON.stringify(ast, null, 2));
+          break;
+        }
+        try {
+          const response = await withDaemonClient((client) => executePluginAxl(source, client));
+          console.log(response);
+        } catch (error) {
+          console.error(encodeAxlError(error));
+          process.exitCode = 1;
+        }
         break;
       }
 
@@ -386,7 +390,7 @@ async function main() {
           throw new Error("Usage: mcp edit <path> <old> <new>");
         }
         const result = await withClient(async (c) => {
-          logger.cli("edit", filePath); await c.log(`✏️ edit ${filePath}`);
+          logger.cli("edit", filePath); await c.log(studioLog(studioEmoji.edit, `Edit ${filePath}`));
           return c.editScript(filePath, [
             { old_string: oldString, new_string: newString },
           ]);
@@ -402,7 +406,7 @@ async function main() {
         }
         const { calls, mode } = parseJson(fs.readFileSync(file, "utf8"));
         const result = await withClient(async (c) => {
-          logger.cli("batch"); await c.log("📦 batch");
+          logger.cli("batch"); await c.log(studioLog(studioEmoji.batch, "Run batch"));
           return c.batch(calls, mode);
         });
         console.log(JSON.stringify(result, null, 2));
@@ -424,7 +428,7 @@ async function main() {
           .map((l) => l.trim())
           .filter(Boolean);
         const result = await withClient(async (c) => {
-          logger.cli("find-replace"); await c.log("🔁 find-replace");
+          logger.cli("find-replace"); await c.log(studioLog(studioEmoji.replace, "Find and replace"));
           return c.findReplace(paths, oldString, newString || "");
         });
         console.log(JSON.stringify(result, null, 2));
@@ -434,7 +438,7 @@ async function main() {
       case "search": {
         const keywords = args.join(" ");
         const result = await withClient(async (c) => {
-          logger.cli("search"); await c.log("🔍 search");
+          logger.cli("search"); await c.log(studioLog(studioEmoji.search, "Search scripts"));
           return c.searchScripts(
             keywords
               ? {
@@ -479,7 +483,7 @@ async function main() {
 
         const runWithClient = targets.length > 0 ? withClient : withDaemonClient;
         await runWithClient(async (client) => {
-          logger.cli("pull", outputDir); await client.log(`📥 pull -> ${outputDir}`);
+          logger.cli("pull", outputDir); await client.log(studioLog(studioEmoji.pull, `Pull scripts to ${outputDir}`));
           const puller = new Puller(client, {
             outputDir,
             targets: targets.length > 0 ? targets : undefined,
@@ -510,7 +514,7 @@ async function main() {
             console.log(`Pushed ${file} -> ${studioPath}`);
             console.log(JSON.stringify(result, null, 2));
           }
-          logger.cli("push", `${file} -> ${studioPath}`); await client.log(`🚀 push ${file}`);
+          logger.cli("push", `${file} -> ${studioPath}`); await client.log(studioLog(studioEmoji.push, `Push ${file}`));
         });
         break;
       }
@@ -549,9 +553,10 @@ async function main() {
             });
           }
           if (sub === "call") {
-            const [type, json] = pluginArgs;
-            if (!type) throw new Error("Usage: mcp plugin call <type> [json]");
-            return c.pluginCall({ type, ...parseJson(json) });
+            const [type, ...inputArgs] = pluginArgs;
+            if (!type) throw new Error("Usage: mcp plugin call <type> [json|--json-file <file>|--json-stdin]");
+            const commandArguments = await readJsonObjectArgument(inputArgs);
+            return c.pluginCall({ ...commandArguments, type });
           }
           throw new Error(
             "Usage: mcp plugin [status|events|selection|state|inspect|select|open|call]",
@@ -617,7 +622,7 @@ async function repl() {
 
       try {
         if (trimmed === "state") {
-          logger.cli("repl state"); await client.log("📊 repl state");
+          logger.cli("repl state"); await client.log(studioLog(studioEmoji.repl, "Read Studio state (REPL)"));
           console.log(JSON.stringify(await client.state(), null, 2));
           continue;
         }
@@ -627,7 +632,7 @@ async function repl() {
         }
         if (trimmed.startsWith("execute ")) {
           const code = trimmed.slice(8);
-          logger.cli("repl execute"); await client.log("▶️ repl execute");
+          logger.cli("repl execute"); await client.log(studioLog(studioEmoji.execute, "Execute Luau (REPL)"));
           console.log(JSON.stringify(await client.execute(code), null, 2));
           continue;
         }
@@ -638,7 +643,7 @@ async function repl() {
         const [name, ...jsonParts] = parts;
         const json = jsonParts.join(" ");
         await client.log(
-          `🎮 repl ${useSmart ? "smart" : "call"}: ${name}`,
+          studioLog(studioEmoji.repl, `${useSmart ? "Smart call" : "Call"} ${name} (REPL)`),
         );
         console.log(
           JSON.stringify(

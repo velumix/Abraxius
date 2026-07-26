@@ -1,3 +1,4 @@
+use axum::extract::DefaultBodyLimit;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Query, State};
 use axum::http::StatusCode;
@@ -17,6 +18,7 @@ use tokio::sync::{Mutex, mpsc, oneshot};
 const MCP_PORT: u16 = 13469;
 const API_PORT: u16 = 13470;
 const PLUGIN_PORT: u16 = 13471;
+const ANALYTICS_PORT: u16 = 13472;
 const PROTOCOL_VERSION: &str = "2024-11-05";
 
 #[tokio::main]
@@ -35,17 +37,29 @@ async fn run() -> Result<(), String> {
         .with_state(state.clone());
     let api_router = api_router(state.clone());
     let plugin_router = plugin_router(state.clone());
+    let analytics_router = analytics_router(state.clone());
 
     println!("Rust MCP bridge listening on ws://localhost:{MCP_PORT}/studio");
     println!("Rust HTTP API listening on http://localhost:{API_PORT}");
     println!("Rust companion channel listening on http://localhost:{PLUGIN_PORT}");
+    println!("Rust analytics channel listening on http://localhost:{ANALYTICS_PORT}");
 
-    tokio::try_join!(
-        serve(mcp_router, MCP_PORT),
+    let legacy_mcp = tokio::spawn(async move {
+        if let Err(err) = serve(mcp_router, MCP_PORT).await {
+            eprintln!(
+                "Legacy MCP listener unavailable; continuing with API and companion services: {err}"
+            );
+        }
+    });
+
+    let result = tokio::try_join!(
         serve(api_router, API_PORT),
         serve(plugin_router, PLUGIN_PORT),
+        serve(analytics_router, ANALYTICS_PORT),
     )
-    .map(|_| ())
+    .map(|_| ());
+    legacy_mcp.abort();
+    result
 }
 
 async fn serve(router: Router, port: u16) -> Result<(), String> {
@@ -71,11 +85,15 @@ fn api_router(state: AppState) -> Router {
         .route("/memory", get(api_memory).post(api_remember))
         .route("/memory/clear", post(api_memory_clear))
         .route("/pending", get(api_pending))
+        .route("/pending/record", post(api_pending_record))
         .route("/pending/verify", post(api_pending_verify))
         .route("/pending/clear", post(api_pending_clear))
         .route("/plugin/status", get(api_plugin_status))
         .route("/plugin/events", get(api_plugin_events))
-        .route("/plugin/call", post(api_plugin_call))
+        .route(
+            "/plugin/call",
+            post(api_plugin_call).layer(DefaultBodyLimit::max(32 * 1024 * 1024)),
+        )
         .route("/shutdown", post(api_shutdown))
         .with_state(state)
 }
@@ -88,6 +106,14 @@ fn plugin_router(state: AppState) -> Router {
         .route("/plugin/status", get(plugin_status))
         .route("/plugin/events", get(plugin_events))
         .route("/plugin/call", post(plugin_call))
+        .layer(DefaultBodyLimit::max(64 * 1024 * 1024))
+        .with_state(state)
+}
+
+fn analytics_router(state: AppState) -> Router {
+    Router::new()
+        .route("/snapshot", get(analytics_snapshot))
+        .route("/studio", post(analytics_studio))
         .with_state(state)
 }
 
@@ -96,6 +122,7 @@ struct AppState {
     bridge: Arc<Mutex<BridgeState>>,
     context: Arc<Mutex<ContextState>>,
     plugin: Arc<Mutex<PluginState>>,
+    analytics: Arc<Mutex<AnalyticsState>>,
     pending_pushes: Arc<Mutex<HashMap<String, PendingPush>>>,
     started_at: Instant,
 }
@@ -106,6 +133,7 @@ impl AppState {
             bridge: Arc::new(Mutex::new(BridgeState::default())),
             context: Arc::new(Mutex::new(ContextState::default())),
             plugin: Arc::new(Mutex::new(PluginState::default())),
+            analytics: Arc::new(Mutex::new(AnalyticsState::default())),
             pending_pushes: Arc::new(Mutex::new(HashMap::new())),
             started_at: Instant::now(),
         }
@@ -155,8 +183,15 @@ struct PluginState {
     next_event_id: u64,
 }
 
+#[derive(Default)]
+struct AnalyticsState {
+    studio: Value,
+    updated_at: u128,
+}
+
 struct PluginSession {
     id: String,
+    version: Option<String>,
     created_at: u128,
     last_seen_at: u128,
     commands: VecDeque<Value>,
@@ -262,7 +297,7 @@ async fn handle_mcp_socket(socket: WebSocket, state: AppState) -> Result<(), Str
         cleanup_mcp_connection(&state, generation).await;
         return Err(err);
     }
-    let _ = log_to_studio(&state, "[Abraxius] Rust bridge connected").await;
+    let _ = log_to_studio(&state, "\u{1F517} Studio MCP connected").await;
 
     let read_result = match reader.await {
         Ok(result) => result,
@@ -425,6 +460,7 @@ async fn api_health(State(state): State<AppState>) -> impl IntoResponse {
         "studio": bridge.server_info,
         "toolsLoaded": bridge.tools.len(),
         "pluginConnected": plugin_connected(&plugin),
+        "pluginVersion": plugin.session.as_ref().and_then(|session| session.version.clone()),
         "pluginEvents": plugin.events.len(),
         "uptime": state.started_at.elapsed().as_secs(),
         "studioUptime": bridge.connected_at.map(|t| t.elapsed().as_secs()).unwrap_or(0),
@@ -485,10 +521,11 @@ async fn api_execute(
     Json(body): Json<ExecuteBody>,
 ) -> impl IntoResponse {
     let datamodel = body.datamodel_type.unwrap_or_else(|| "Edit".into());
+    let code = body.code;
     match call_tool(
         &state,
         "execute_luau",
-        json!({ "code": body.code, "datamodel_type": datamodel }),
+        json!({ "code": code.clone(), "datamodel_type": datamodel }),
     )
     .await
     {
@@ -496,7 +533,34 @@ async fn api_execute(
             record_operation(&state, "execute", None, Some("execute_luau".into())).await;
             ok(result)
         }
-        Err(err) => error(StatusCode::SERVICE_UNAVAILABLE, err),
+        Err(mcp_error) => match plugin_command(
+            &state,
+            json!({ "type": "execute_luau", "code": code, "confirm": true }),
+        )
+        .await
+        {
+            Ok(result) if result.get("ok").and_then(Value::as_bool) == Some(true) => {
+                record_operation(
+                    &state,
+                    "execute",
+                    None,
+                    Some("companion execute_luau".into()),
+                )
+                .await;
+                ok(result)
+            }
+            Ok(result) => error(
+                StatusCode::BAD_REQUEST,
+                result
+                    .get("error")
+                    .and_then(Value::as_str)
+                    .unwrap_or("Companion execution failed"),
+            ),
+            Err(plugin_error) => error(
+                StatusCode::SERVICE_UNAVAILABLE,
+                format!("MCP: {mcp_error}; companion: {plugin_error}"),
+            ),
+        },
     }
 }
 
@@ -632,6 +696,34 @@ async fn api_pending(State(state): State<AppState>) -> impl IntoResponse {
     Json(json!({ "pushes": list }))
 }
 
+#[derive(Deserialize)]
+struct PendingRecordBody {
+    path: String,
+    source: String,
+}
+
+async fn api_pending_record(
+    State(state): State<AppState>,
+    Json(body): Json<PendingRecordBody>,
+) -> impl IntoResponse {
+    record_pending(&state, &body.path, &body.source).await;
+    let push = state.pending_pushes.lock().await.get(&body.path).cloned();
+    let verify_state = state.clone();
+    let verify_path = body.path.clone();
+    tokio::spawn(async move {
+        if let Ok(value) = plugin_command(
+            &verify_state,
+            json!({ "type": "read_source", "path": verify_path.clone() }),
+        )
+        .await
+        {
+            let source = value.get("source").and_then(Value::as_str).unwrap_or("");
+            verify_pending_source(&verify_state, &verify_path, source).await;
+        }
+    });
+    ok(json!({ "ok": true, "push": push }))
+}
+
 async fn api_pending_verify(State(state): State<AppState>) -> impl IntoResponse {
     let paths = state
         .pending_pushes
@@ -648,9 +740,9 @@ async fn api_pending_verify(State(state): State<AppState>) -> impl IntoResponse 
             match result {
                 Ok(value) => {
                     let source = value.get("source").and_then(Value::as_str).unwrap_or("");
-                    let stale = hash_source(source) != push.source_hash;
-                    push.stale = Some(stale);
-                    push.status = if stale { "stale".into() } else { "live".into() };
+                    let matches = hash_source(source) == push.source_hash;
+                    push.stale = if matches { Some(false) } else { None };
+                    push.status = if matches { "live".into() } else { "pending".into() };
                     push.verified_at = Some(now_ms());
                     push.error = None;
                 }
@@ -734,9 +826,52 @@ async fn plugin_health(State(state): State<AppState>) -> impl IntoResponse {
 }
 
 #[derive(Deserialize)]
+struct AnalyticsBody {
+    #[serde(rename = "sessionId")]
+    session_id: String,
+    snapshot: Value,
+}
+
+async fn analytics_studio(
+    State(state): State<AppState>,
+    Json(body): Json<AnalyticsBody>,
+) -> impl IntoResponse {
+    let plugin = state.plugin.lock().await;
+    if plugin.session.as_ref().map(|session| session.id.as_str()) != Some(body.session_id.as_str())
+    {
+        return error(
+            StatusCode::BAD_REQUEST,
+            "Invalid or missing analytics session",
+        );
+    }
+    drop(plugin);
+
+    let mut analytics = state.analytics.lock().await;
+    analytics.studio = body.snapshot;
+    analytics.updated_at = now_ms();
+    ok(json!({ "ok": true, "updatedAt": analytics.updated_at }))
+}
+
+async fn analytics_snapshot(State(state): State<AppState>) -> impl IntoResponse {
+    let analytics = state.analytics.lock().await;
+    let age_ms = if analytics.updated_at == 0 {
+        None
+    } else {
+        Some(now_ms().saturating_sub(analytics.updated_at))
+    };
+    Json(json!({
+        "connected": analytics.updated_at > 0 && age_ms.unwrap_or(u128::MAX) < 10_000,
+        "updatedAt": if analytics.updated_at == 0 { None } else { Some(analytics.updated_at) },
+        "ageMs": age_ms,
+        "studio": analytics.studio
+    }))
+}
+
+#[derive(Deserialize)]
 struct RegisterBody {
     #[serde(rename = "sessionId")]
     session_id: Option<String>,
+    version: Option<String>,
 }
 
 async fn plugin_register(
@@ -749,9 +884,13 @@ async fn plugin_register(
     let mut plugin = state.plugin.lock().await;
     if let Some(session) = plugin.session.as_mut().filter(|session| session.id == id) {
         session.last_seen_at = now_ms();
+        if body.version.is_some() {
+            session.version = body.version;
+        }
     } else {
         plugin.session = Some(PluginSession {
             id: id.clone(),
+            version: body.version,
             created_at: now_ms(),
             last_seen_at: now_ms(),
             commands: VecDeque::new(),
@@ -904,18 +1043,33 @@ async fn record_pending_from_args(state: &AppState, args: &Value) {
         .and_then(|edit| edit.get("new_string"))
         .and_then(Value::as_str);
     if let (Some(path), Some(source)) = (path, source) {
-        state.pending_pushes.lock().await.insert(
-            path.to_string(),
-            PendingPush {
-                path: path.to_string(),
-                source_hash: hash_source(source),
-                pushed_at: now_ms(),
-                status: "pending".into(),
-                verified_at: None,
-                stale: None,
-                error: None,
-            },
-        );
+        record_pending(state, path, source).await;
+    }
+}
+
+async fn record_pending(state: &AppState, path: &str, source: &str) {
+    state.pending_pushes.lock().await.insert(
+        path.to_string(),
+        PendingPush {
+            path: path.to_string(),
+            source_hash: hash_source(source),
+            pushed_at: now_ms(),
+            status: "pending".into(),
+            verified_at: None,
+            stale: None,
+            error: None,
+        },
+    );
+}
+
+async fn verify_pending_source(state: &AppState, path: &str, source: &str) {
+    let mut pushes = state.pending_pushes.lock().await;
+    if let Some(push) = pushes.get_mut(path) {
+        let matches = hash_source(source) == push.source_hash;
+        push.stale = if matches { Some(false) } else { None };
+        push.status = if matches { "live".into() } else { "pending".into() };
+        push.verified_at = Some(now_ms());
+        push.error = None;
     }
 }
 
@@ -945,6 +1099,11 @@ async fn ingest_studio_event(state: &AppState, event: Value) {
         .and_then(Value::as_str)
         .unwrap_or("unknown")
         .to_string();
+    let source_changed_path = if event_type == "source_changed" {
+        event.get("path").and_then(Value::as_str).map(str::to_string)
+    } else {
+        None
+    };
     let mut context = state.context.lock().await;
     *context
         .studio_event_counts
@@ -1013,6 +1172,22 @@ async fn ingest_studio_event(state: &AppState, event: Value) {
         while context.recent_studio_events.len() > 32 {
             context.recent_studio_events.pop_back();
         }
+    }
+    drop(context);
+
+    if let Some(path) = source_changed_path {
+        let state = state.clone();
+        tokio::spawn(async move {
+            if !state.pending_pushes.lock().await.contains_key(&path) {
+                return;
+            }
+            if let Ok(value) =
+                plugin_command(&state, json!({ "type": "read_source", "path": path.clone() })).await
+            {
+                let source = value.get("source").and_then(Value::as_str).unwrap_or("");
+                verify_pending_source(&state, &path, source).await;
+            }
+        });
     }
 }
 
@@ -1210,9 +1385,11 @@ async fn plugin_status_json(state: &AppState) -> Value {
     json!({
         "connected": plugin_connected(&plugin),
         "sessionId": plugin.session.as_ref().map(|s| s.id.clone()),
+        "version": plugin.session.as_ref().and_then(|s| s.version.clone()),
         "lastSeenAt": plugin.session.as_ref().map(|s| s.last_seen_at),
         "session": plugin.session.as_ref().map(|s| json!({
             "id": s.id,
+            "version": s.version,
             "createdAt": s.created_at,
             "lastSeenAt": s.last_seen_at,
             "queuedCommands": s.commands.len(),

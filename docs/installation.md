@@ -5,7 +5,7 @@
 - Windows 10 or Windows 11
 - Node.js 18+
 - Rust toolchain
-- .NET 9 SDK
+- .NET 11 Preview SDK while .NET 11 is pre-release
 - Windows Developer Mode for development package registration
 - Roblox Studio with **Allow HTTP Requests** enabled
 
@@ -55,8 +55,8 @@ MCP card may remain **Waiting** while companion-based sync continues to work.
 
 ```powershell
 npm install -g .
-mcp status
-mcp pull game
+abraxius status
+abraxius pull game
 ```
 
 ## MCP compatibility
@@ -64,5 +64,5 @@ mcp pull game
 Current Roblox Studio releases expose their official MCP client through
 `%LOCALAPPDATA%\Roblox\mcp.bat` and `StudioMCP.exe` using stdio. Abraxius's
 legacy WebSocket route is not a replacement for that transport. Generic MCP
-calls, targeted pull, and new-script creation require a compatible MCP
-connection; companion-based full pull and existing-script push do not.
+calls, targeted pull, and every script push require a compatible MCP connection.
+Companion-based full pull remains available without MCP.

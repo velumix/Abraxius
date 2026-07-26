@@ -56,9 +56,9 @@ function testPendingPushes() {
   assert.strictEqual(live.status, "live");
   assert.strictEqual(live.stale, false);
 
-  const stale = pending.verify("ServerScriptService.Test", "print('changed')");
-  assert.strictEqual(stale.status, "stale");
-  assert.strictEqual(stale.stale, true);
+  const uncommitted = pending.verify("ServerScriptService.Test", "print('changed')");
+  assert.strictEqual(uncommitted.status, "pending");
+  assert.strictEqual(uncommitted.stale, null);
 }
 
 function testPluginEvents() {

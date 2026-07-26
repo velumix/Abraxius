@@ -21,9 +21,7 @@ public partial class App : Application
         UnhandledException += (_, args) =>
         {
             System.Diagnostics.Debug.WriteLine(args.Exception);
-            File.AppendAllText(
-                Path.Combine(Path.GetTempPath(), "abraxius-winui-error.log"),
-                $"{DateTimeOffset.Now:O}\r\n{args.Exception}\r\n\r\n");
+            AppDiagnostics.RecordUnhandled(args.Exception);
             args.Handled = false;
         };
     }

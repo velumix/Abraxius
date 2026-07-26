@@ -11,12 +11,20 @@ local ScriptEditorService = game:GetService("ScriptEditorService")
 local LogService = game:GetService("LogService")
 local ChangeHistoryService = game:GetService("ChangeHistoryService")
 local CollectionService = game:GetService("CollectionService")
+local Stats = game:GetService("Stats")
+local Players = game:GetService("Players")
+local EncodingService = game:GetService("EncodingService")
+local SerializationService = game:GetService("SerializationService")
 local Logger = require(script.Logger)
 
 local PLUGIN_URL = "http://localhost:13471"
+local ANALYTICS_URL = "http://localhost:13472"
+local PLUGIN_VERSION = "1.8.1"
 local POLL_INTERVAL = 0.5
 local EVENT_LIMIT = 64
 local CONTEXT_SNAPSHOT_INTERVAL = 10
+local ANALYTICS_INTERVAL = 2
+local ANALYTICS_HIERARCHY_INTERVAL = 10
 local SOURCE_CHANGE_DEBOUNCE = 1.25
 local CONTEXT_SERVICES = {
 	"Workspace", "Lighting", "ReplicatedFirst", "ReplicatedStorage",
@@ -26,14 +34,25 @@ local CONTEXT_SERVICES = {
 
 local plugin = plugin
 if not plugin then
-	print("❌ DISCONNECT │ No plugin global found; this script must run as a plugin.")
+	Logger.error("Companion must run as a Studio plugin")
+	return
+end
+
+-- Studio clones plugins into the Server and Client DataModels during play.
+-- Only Edit is persistent and may own the companion HTTP/session loop; allowing
+-- the runtime clones to register makes all three DataModels evict each other
+-- from the daemon's single command session.
+if RunService:IsRunning() then
 	return
 end
 
 -- State ----------------------------------------------------------------------
 local sessionId: string? = nil
 local connected = false
+local lastConnectionError = ""
+local lastConnectionLogAt = -math.huge
 local commandHandlers: { [string]: (payload: any) -> any } = {}
+local transactionActive = false
 local eventQueue: { any } = {}
 local recentEvents: { any } = {}
 local eventListDirty = true
@@ -58,6 +77,31 @@ local loopStopped = false
 local retryDelay = 1
 local MAX_RETRY_DELAY = 15
 local lastContextSnapshot = 0
+local lastAnalyticsSnapshot = 0
+local lastAnalyticsHierarchy = 0
+local analyticsCounts = { instances = 0, scripts = 0, parts = 0, models = 0, guis = 0 }
+local analyticsOutput: { any } = {}
+local analyticsScriptActivity: { any } = {}
+local playSession = {
+	active = false,
+	startedAt = nil :: number?,
+	prints = 0,
+	warnings = 0,
+	errors = 0,
+}
+local playDataEnabled = plugin:GetSetting("PlayDataEnabled") ~= false
+
+local function setPlayDataEnabled(enabled: boolean)
+	playDataEnabled = enabled
+	plugin:SetSetting("PlayDataEnabled", enabled)
+	if not enabled then
+		analyticsOutput = {}
+		analyticsScriptActivity = {}
+		playSession.prints = 0
+		playSession.warnings = 0
+		playSession.errors = 0
+	end
+end
 local lastMode = "Unknown"
 local hierarchyChanges = { added = 0, removed = 0, paths = {} }
 local lastRenderedConnected: boolean? = nil
@@ -92,65 +136,146 @@ local function getModePayload(): any
 	return {
 		isEdit = RunService:IsEdit(),
 		isRunning = RunService:IsRunning(),
-		currentDataModel = if RunService:IsEdit() then "Edit" elseif RunService:IsRunning() then "Play" else "Unknown",
+		currentDataModel = if RunService:IsRunning() then "Play" elseif RunService:IsEdit() then "Edit" else "Unknown",
 		placeId = game.PlaceId,
 	}
 end
 
-local function post(path: string, payload: any): (boolean, any)
-	local ok, result = pcall(function()
-		return HttpService:RequestAsync({
-			Url = PLUGIN_URL .. path,
-			Method = "POST",
-			Headers = { ["Content-Type"] = "application/json" },
-			Body = HttpService:JSONEncode(payload),
-		})
-	end)
-	if not ok then
-		return false, tostring(result)
+--#include modules/Transport.luau as Transport
+local transport = Transport.create(HttpService)
+local postTo = transport.postTo
+local post = transport.bind(PLUGIN_URL)
+
+local function updatePlaySessionState()
+	local running = RunService:IsRunning()
+	if running and not playSession.active then
+		playSession.active = true
+		playSession.startedAt = os.time()
+		playSession.prints = 0
+		playSession.warnings = 0
+		playSession.errors = 0
+		analyticsOutput = {}
+		analyticsScriptActivity = {}
+	elseif not running and playSession.active then
+		playSession.active = false
 	end
-	if result.Body then
-		local decodeOk, decoded = pcall(HttpService.JSONDecode, HttpService, result.Body)
-		if decodeOk then
-			return result.Success, decoded
+end
+
+local function sampleStudioAnalytics(): any
+	updatePlaySessionState()
+	if os.clock() - lastAnalyticsHierarchy >= ANALYTICS_HIERARCHY_INTERVAL then
+		local counts = { instances = 0, scripts = 0, parts = 0, models = 0, guis = 0 }
+		for _, inst in ipairs(game:GetDescendants()) do
+			counts.instances += 1
+			if inst:IsA("LuaSourceContainer") then counts.scripts += 1 end
+			if inst:IsA("BasePart") then counts.parts += 1 end
+			if inst:IsA("Model") then counts.models += 1 end
+			if inst:IsA("GuiObject") then counts.guis += 1 end
 		end
+		analyticsCounts = counts
+		lastAnalyticsHierarchy = os.clock()
 	end
-	return false, result.Body or "unknown"
-end
 
-local function resolvePath(path: string): Instance?
-	local parts = string.split(path, ".")
-	local current: Instance? = game
-	for _, part in ipairs(parts) do
-		if current == nil then return nil end
-		if part == "game" then continue end
-		current = current:FindFirstChild(part)
+	local totalMemoryMb: number? = nil
+	pcall(function() totalMemoryMb = Stats:GetTotalMemoryUsageMb() end)
+	local memoryByTag = {}
+	for _, tagName in ipairs({ "LuaHeap", "Instances", "Signals", "PhysicsParts", "GraphicsTexture", "GraphicsMeshParts", "Script" }) do
+		pcall(function()
+			local tag = (Enum.DeveloperMemoryTag :: any)[tagName]
+			if tag then memoryByTag[tagName] = Stats:GetMemoryUsageMbForTag(tag) end
+		end)
 	end
-	return current
-end
+	local physicsFps: number? = nil
+	pcall(function() physicsFps = workspace:GetRealPhysicsFPS() end)
 
-local function instanceInfo(inst: Instance): any
 	return {
-		className = inst.ClassName,
-		name = inst.Name,
-		fullName = inst:GetFullName(),
-		path = string.gsub(inst:GetFullName(), "^game%.", ""),
+		capturedAt = DateTime.now().UnixTimestampMillis,
+		pluginVersion = PLUGIN_VERSION,
+		placeId = game.PlaceId,
+		mode = if RunService:IsRunning() then "Play" elseif RunService:IsEdit() then "Edit" else "Unknown",
+		isClient = RunService:IsClient(),
+		isServer = RunService:IsServer(),
+		isRunning = RunService:IsRunning(),
+		players = #Players:GetPlayers(),
+		latencyMs = lastLatencyMs,
+		totalMemoryMb = totalMemoryMb,
+		memoryByTag = memoryByTag,
+		physicsFps = physicsFps,
+		counts = analyticsCounts,
+		playtest = {
+			enabled = playDataEnabled,
+			active = RunService:IsRunning(),
+			startedAt = playSession.startedAt,
+			elapsedSec = if playSession.startedAt then math.max(0, os.time() - playSession.startedAt) else 0,
+			prints = playSession.prints,
+			warnings = playSession.warnings,
+			errors = playSession.errors,
+			output = if playDataEnabled then analyticsOutput else {},
+		},
+		scriptActivity = if playDataEnabled then analyticsScriptActivity else {},
 	}
 end
 
+local function appendBounded(list: { any }, value: any, limit: number)
+	table.insert(list, 1, value)
+	while #list > limit do table.remove(list) end
+end
+
+local function classifyOutput(message: string, messageType: Enum.MessageType): any
+	local level = if messageType == Enum.MessageType.MessageError then "error"
+		elseif messageType == Enum.MessageType.MessageWarning then "warning"
+		elseif messageType == Enum.MessageType.MessageInfo then "info"
+		else "print"
+	local scriptPath = string.match(message, "Script '([^']+)'")
+	local line = tonumber(string.match(message, "[Ll]ine (%d+)") or string.match(message, ":(%d+):"))
+	return {
+		time = DateTime.now().UnixTimestampMillis,
+		level = level,
+		message = string.sub(message, 1, 4000),
+		script = scriptPath,
+		line = line,
+		playtest = RunService:IsRunning(),
+	}
+end
+
+--#include modules/Pathing.luau as Pathing
+local resolvePath = Pathing.resolve
+local instanceInfo = Pathing.info
+
+--#include modules/CommandSchema.luau as CommandSchema
+local CAPABILITIES = CommandSchema.capabilities
+local COMMAND_SCHEMAS = CommandSchema.commands
+--#include modules/Export.luau as Export
+--#include modules/Inspection.luau as Inspection
+--#include modules/Update.luau as Update
+--#include modules/AXL.luau as AXL
+
+--#include modules/SourceCodec.luau as SourceCodec
+local codec = SourceCodec.create(resolvePath)
+local encodeValue = codec.encode
+local decodeValue = codec.decode
+
+local function requireEditMode(): (boolean, string?)
+	if not RunService:IsEdit() then
+		return false, "This operation is only available in Studio edit mode"
+	end
+	return true, nil
+end
+
+local function waypoint(name: string)
+	if transactionActive then return end
+	pcall(ChangeHistoryService.SetWaypoint, ChangeHistoryService, name)
+end
+
+local sourceDiff = SourceCodec.diff
+
 local function currentMode(): string
-	if RunService:IsEdit() then return "Edit" end
 	if RunService:IsRunning() then return "Play" end
+	if RunService:IsEdit() then return "Edit" end
 	return "Unknown"
 end
 
-local function hashSource(source: string): string
-	local hash = 5381
-	for i = 1, #source do
-		hash = (hash * 33 + string.byte(source, i)) % 4294967296
-	end
-	return string.format("%08x", hash)
-end
+local hashSource = SourceCodec.hash
 
 local function buildContextSnapshot(): any
 	local selected = {}
@@ -551,7 +676,7 @@ local function updatePanel()
 		ui.sessionId.Text = sessionId or "none"
 	end
 	if ui.mode then
-		ui.mode.Text = if RunService:IsEdit() then "Edit" elseif RunService:IsRunning() then "Play" else "Unknown"
+		ui.mode.Text = if RunService:IsRunning() then "Play" elseif RunService:IsEdit() then "Edit" else "Unknown"
 	end
 	if ui.latency then
 		ui.latency.Text = string.format("%d ms", lastLatencyMs)
@@ -869,7 +994,7 @@ local function createPanel()
 	title.Position = UDim2.fromOffset(56, 10)
 	title.Size = UDim2.new(1, -190, 0, 24)
 	title.TextWrapped = false
-	local subtitle = createText(header, "A VELUMIX™ STUDIO TOOL", 0, 9, true, PALETTE.textMuted)
+	local subtitle = createText(header, "A VELUMIX STUDIO TOOL", 0, 9, true, PALETTE.textMuted)
 	subtitle.Position = UDim2.fromOffset(56, 31)
 	subtitle.Size = UDim2.new(1, -190, 0, 18)
 	subtitle.TextWrapped = false
@@ -1159,7 +1284,7 @@ local function createPanel()
 	signalList.BackgroundColor3 = PALETTE.surface
 	signalList.BorderSizePixel = 0
 	signalList.Position = UDim2.fromOffset(10, 78)
-	signalList.Size = UDim2.new(1, -20, 0, 176)
+	signalList.Size = UDim2.new(1, -20, 0, 211)
 	local signalCorner = Instance.new("UICorner")
 	signalCorner.CornerRadius = UDim.new(0, 6)
 	signalCorner.Parent = signalList
@@ -1179,12 +1304,16 @@ local function createPanel()
 		end)
 		toggle.Size = UDim2.new(1, 0, 0, 31)
 	end
+	local playDataToggle = createToggle(signalList, "Play data analytics", playDataEnabled, function(enabled)
+		setPlayDataEnabled(enabled)
+	end)
+	playDataToggle.Size = UDim2.new(1, 0, 0, 31)
 
 	local sessionBand = Instance.new("Frame")
 	sessionBand.BackgroundColor3 = PALETTE.surface
 	sessionBand.BorderSizePixel = 0
-	sessionBand.Position = UDim2.fromOffset(10, 266)
-	sessionBand.Size = UDim2.new(1, -20, 0, 66)
+	sessionBand.Position = UDim2.fromOffset(10, 301)
+	sessionBand.Size = UDim2.new(1, -20, 0, 56)
 	local sessionCorner = Instance.new("UICorner")
 	sessionCorner.CornerRadius = UDim.new(0, 6)
 	sessionCorner.Parent = sessionBand
@@ -1237,7 +1366,7 @@ local function createPanel()
 	errorValue.Size = UDim2.new(1, -112, 0, 18)
 	errorValue.TextTruncate = Enum.TextTruncate.AtEnd
 	ui.errorLabel = errorValue
-	local trademark = createText(footer, "VELUMIX™", 0, 9, true, PALETTE.textMuted)
+	local trademark = createText(footer, "VELUMIX", 0, 9, true, PALETTE.textMuted)
 	trademark.AnchorPoint = Vector2.new(1, 0.5)
 	trademark.Position = UDim2.new(1, -12, 0.5, 2)
 	trademark.Size = UDim2.fromOffset(82, 24)
@@ -1249,38 +1378,105 @@ end
 
 -- Command handlers ------------------------------------------------------------
 commandHandlers["read_source"] = function(payload: any): any
-	local inst = resolvePath(payload.path)
-	if not inst then
-		return { ok = false, error = "Instance not found: " .. tostring(payload.path) }
+	return Inspection.source(resolvePath(payload.path), payload.path, instanceInfo, hashSource)
+end
+
+commandHandlers["write_source"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local validation = Update.validateSource(resolvePath(payload.path), payload, hashSource, sourceDiff)
+	if validation.error then return { ok = false, error = validation.error, currentHash = validation.currentHash } end
+	local inst = validation.instance :: LuaSourceContainer
+	local previousSource = validation.previous
+	local diff = validation.diff
+	if payload.dryRun == true then
+		return {
+			ok = true, dryRun = true, changed = previousSource ~= payload.source,
+			previousHash = hashSource(previousSource), sourceHash = hashSource(payload.source),
+			sourceLength = #payload.source, diff = diff,
+		}
 	end
-	if not inst:IsA("LuaSourceContainer") then
-		return { ok = false, error = "Not a script: " .. tostring(payload.path) }
+	local updated, updateError = pcall(function()
+		ScriptEditorService:UpdateSourceAsync(inst, function()
+			return payload.source
+		end)
+	end)
+	if not updated then
+		updated, updateError = pcall(function() inst.Source = payload.source end)
 	end
-	return { ok = true, source = inst.Source, sourceLength = #inst.Source }
+	if not updated then return { ok = false, error = tostring(updateError) } end
+	if inst.Source ~= payload.source then return { ok = false, error = "Studio did not commit the requested source" } end
+	waypoint("Abraxius: Write " .. inst.Name)
+	return {
+		ok = true,
+		script = instanceInfo(inst),
+		changed = previousSource ~= payload.source,
+		previousHash = hashSource(previousSource),
+		sourceHash = hashSource(inst.Source),
+		sourceLength = #inst.Source,
+		diff = diff,
+	}
+end
+
+commandHandlers["create_script"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local className = tostring(payload.className or "ModuleScript")
+	if className ~= "Script" and className ~= "LocalScript" and className ~= "ModuleScript" then
+		return { ok = false, error = "className must be Script, LocalScript, or ModuleScript" }
+	end
+	local parentPath = payload.parent
+	local requestedName = payload.name
+	if payload.path ~= nil then
+		if typeof(payload.path) ~= "string" or payload.path == "" then return { ok = false, error = "path must be a non-empty string" } end
+		local parts = string.split(payload.path, ".")
+		requestedName = table.remove(parts)
+		parentPath = table.concat(parts, ".")
+		if parentPath == "" then return { ok = false, error = "path must include a parent" } end
+	end
+	local parent = resolvePath(parentPath)
+	if not parent then return { ok = false, error = "Parent not found: " .. tostring(parentPath) } end
+	local name = tostring(requestedName or "NewScript")
+	if parent:FindFirstChild(name) then return { ok = false, error = "An instance already exists at " .. parent:GetFullName() .. "." .. name } end
+	local scriptInstance = Instance.new(className) :: LuaSourceContainer
+	scriptInstance.Name = name
+	local ok, err = pcall(function()
+		scriptInstance.Source = tostring(payload.source or "")
+		for key, value in pairs(payload.properties or {}) do
+			(scriptInstance :: any)[key] = decodeValue(value)
+		end
+		scriptInstance.Parent = parent
+	end)
+	if not ok then scriptInstance:Destroy(); return { ok = false, error = tostring(err) } end
+	waypoint("Abraxius: Create " .. name)
+	return { ok = true, script = instanceInfo(scriptInstance), sourceHash = hashSource(scriptInstance.Source), sourceLength = #scriptInstance.Source }
+end
+
+commandHandlers["execute_luau"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	if payload.confirm ~= true then return { ok = false, error = "Luau execution requires confirm=true" } end
+	if typeof(payload.code) ~= "string" or payload.code == "" then return { ok = false, error = "code must be a non-empty string" } end
+	if #payload.code > 65536 then return { ok = false, error = "code exceeds the 64 KiB execution limit" } end
+	local runner = Instance.new("ModuleScript")
+	runner.Name = "__AbraxiusExecution_" .. HttpService:GenerateGUID(false)
+	local ok, result = pcall(function()
+		runner.Source = "return function()\n" .. payload.code .. "\nend"
+		runner.Parent = game:GetService("ServerStorage")
+		local fn = require(runner)
+		return fn()
+	end)
+	runner:Destroy()
+	if not ok then return { ok = false, error = tostring(result) } end
+	return { ok = true, result = encodeValue(result) }
 end
 
 commandHandlers["get_selection"] = function(): any
-	local selected = Selection:Get()
-	local out = {}
-	for _, inst in ipairs(selected) do
-		table.insert(out, instanceInfo(inst))
-	end
-	return { ok = true, selection = out }
+	return Inspection.selection(Selection, instanceInfo)
 end
 
 commandHandlers["get_children"] = function(payload: any): any
-	local inst = resolvePath(payload.path)
-	if not inst then
-		return { ok = false, error = "Instance not found: " .. tostring(payload.path) }
-	end
-	local children = {}
-	for _, child in ipairs(inst:GetChildren()) do
-		table.insert(children, instanceInfo(child))
-	end
-	table.sort(children, function(a, b)
-		return a.name < b.name
-	end)
-	return { ok = true, instance = instanceInfo(inst), children = children }
+	return Inspection.children(resolvePath(payload.path), payload.path, instanceInfo)
 end
 
 commandHandlers["set_selection"] = function(payload: any): any
@@ -1303,36 +1499,7 @@ commandHandlers["open_script"] = function(payload: any): any
 end
 
 commandHandlers["export_scripts"] = function(payload: any): any
-	local services = payload.services or {
-		"Workspace", "Lighting", "ReplicatedFirst", "ReplicatedStorage",
-		"ServerScriptService", "ServerStorage", "StarterGui", "StarterPack",
-		"StarterPlayer", "SoundService", "Teams", "Chat", "TextChatService",
-	}
-	local scripts = {}
-	for _, serviceName in ipairs(services) do
-		local service = game:FindFirstChild(tostring(serviceName))
-		if service then
-			for _, inst in ipairs(service:GetDescendants()) do
-				if inst:IsA("LuaSourceContainer") then
-					local runContext = nil
-					if inst:IsA("Script") then
-						runContext = inst.RunContext.Name
-					end
-					table.insert(scripts, {
-						path = string.gsub(inst:GetFullName(), "^game%.", ""),
-						className = inst.ClassName,
-						source = inst.Source,
-						hasChildren = #inst:GetChildren() > 0,
-						runContext = runContext,
-					})
-				end
-			end
-		end
-	end
-	table.sort(scripts, function(a, b)
-		return a.path < b.path
-	end)
-	return { ok = true, scripts = scripts, count = #scripts }
+	return Export.scripts(payload.services, CONTEXT_SERVICES)
 end
 
 commandHandlers["get_state"] = function(): any
@@ -1367,7 +1534,41 @@ commandHandlers["subscribe"] = function(payload: any): any
 end
 
 commandHandlers["ping"] = function(): any
-	return { ok = true, time = os.time(), connected = connected, sessionId = sessionId }
+	return { ok = true, time = os.time(), connected = connected, sessionId = sessionId, version = PLUGIN_VERSION }
+end
+
+commandHandlers["get_capabilities"] = function(): any
+	return {
+		ok = true,
+		protocolVersion = 6,
+		pluginVersion = PLUGIN_VERSION,
+		capabilities = CAPABILITIES,
+		valueTypes = { "Vector2", "Vector3", "CFrame", "Color3", "Color3uint8", "UDim", "UDim2", "BrickColor", "EnumItem", "NumberRange", "Rect", "Instance" },
+		canonicalization = { Color3uint8 = "Color3" },
+		commands = COMMAND_SCHEMAS,
+	}
+end
+
+commandHandlers["get_play_data_settings"] = function(): any
+	return { ok = true, enabled = playDataEnabled }
+end
+
+commandHandlers["set_play_data_enabled"] = function(payload: any): any
+	if typeof(payload.enabled) ~= "boolean" then
+		return { ok = false, error = "enabled must be a boolean" }
+	end
+	setPlayDataEnabled(payload.enabled)
+	return { ok = true, enabled = playDataEnabled }
+end
+
+commandHandlers["get_assistant_context"] = function(): any
+	return {
+		ok = true,
+		pluginVersion = PLUGIN_VERSION,
+		capabilities = CAPABILITIES,
+		context = buildContextSnapshot(),
+		mode = getModePayload(),
+	}
 end
 
 commandHandlers["get_watched_sources"] = function(): any
@@ -1379,12 +1580,50 @@ commandHandlers["get_watched_sources"] = function(): any
 	return { ok = true, count = #paths, paths = paths }
 end
 
+local axl = AXL.create({
+	resolvePath = resolvePath,
+	instanceInfo = instanceInfo,
+	hashSource = hashSource,
+	jsonEncode = function(value: any): string return HttpService:JSONEncode(value) end,
+	contextSnapshot = buildContextSnapshot,
+	requireEditMode = requireEditMode,
+	updateSource = function(instance: LuaSourceContainer, source: string): (boolean, string?, boolean?)
+		local ok, err = pcall(function()
+			ScriptEditorService:UpdateSourceAsync(instance, function() return source end)
+		end)
+		if not ok then return false, tostring(err), nil end
+		return true, nil, instance.Source ~= source
+	end,
+	beginRecording = function(name: string): any
+		return ChangeHistoryService:TryBeginRecording("AbraxiusAXL", name)
+	end,
+	finishRecording = function(recording: any, commit: boolean)
+		if recording then
+			ChangeHistoryService:FinishRecording(
+				recording,
+				if commit then Enum.FinishRecordingOperation.Commit else Enum.FinishRecordingOperation.Cancel
+			)
+		end
+	end,
+	executeLuau = function(code: string): any
+		return commandHandlers["execute_luau"]({ code = code, confirm = true })
+	end,
+	getState = function(): any return commandHandlers["get_state"]({}) end,
+})
+
+commandHandlers["axl"] = function(payload: any): any
+	if typeof(payload.source) ~= "string" then return { ok = false, error = "source must be a string" } end
+	local response = axl.execute(payload.source)
+	return { ok = not string.match(response, "^ERR "), response = response }
+end
+
 commandHandlers["set_properties"] = function(payload: any): any
 	local inst = resolvePath(payload.path)
 	if not inst then
 		return { ok = false, error = "Instance not found: " .. tostring(payload.path) }
 	end
 	local props = payload.properties or {}
+	local changed = {}
 	for key, value in pairs(props) do
 		local ok, err = pcall(function()
 			if key == "RunContext" and typeof(value) == "string" then
@@ -1393,14 +1632,16 @@ commandHandlers["set_properties"] = function(payload: any): any
 					inst.RunContext = enumItem
 				end
 			else
-				inst[key] = value
+				inst[key] = decodeValue(value)
 			end
 		end)
 		if not ok then
-			return { ok = false, error = tostring(err) }
+			return { ok = false, error = tostring(err), changed = changed }
 		end
+		table.insert(changed, key)
 	end
-	return { ok = true }
+	waypoint("Abraxius: Set properties")
+	return { ok = true, changed = changed, instance = instanceInfo(inst) }
 end
 
 commandHandlers["get_properties"] = function(payload: any): any
@@ -1418,11 +1659,225 @@ commandHandlers["get_properties"] = function(payload: any): any
 			if key == "RunContext" and typeof(value) == "EnumItem" then
 				out[key] = value.Name
 			else
-				out[key] = value
+				out[key] = encodeValue(value)
 			end
 		end
 	end
-	return { ok = true, properties = out }
+	return { ok = true, instance = instanceInfo(inst), properties = out }
+end
+
+commandHandlers["create_instance"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local parent = resolvePath(payload.parent or "Workspace")
+	if not parent then return { ok = false, error = "Parent not found: " .. tostring(payload.parent) } end
+	local created: Instance? = nil
+	local ok, err = pcall(function()
+		created = Instance.new(tostring(payload.className))
+		created.Name = tostring(payload.name or payload.className)
+		for key, value in pairs(payload.properties or {}) do
+			(created :: any)[key] = decodeValue(value)
+		end
+		created.Parent = parent
+	end)
+	if not ok or not created then
+		if created then created:Destroy() end
+		return { ok = false, error = tostring(err) }
+	end
+	waypoint("Abraxius: Create " .. created.Name)
+	return { ok = true, instance = instanceInfo(created) }
+end
+
+commandHandlers["import_model"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	if payload.confirm ~= true then return { ok = false, error = "Model import requires confirm=true" } end
+	if payload.format ~= "rbxm" and payload.format ~= "rbxmx" then
+		return { ok = false, error = "format must be rbxm or rbxmx" }
+	end
+	if typeof(payload.contentBase64) ~= "string" or payload.contentBase64 == "" then
+		return { ok = false, error = "contentBase64 must be a non-empty string" }
+	end
+	if #payload.contentBase64 > 28 * 1024 * 1024 then
+		return { ok = false, error = "Encoded model exceeds the 20 MiB asset limit" }
+	end
+	local parent = resolvePath(payload.parent)
+	if not parent then return { ok = false, error = "Parent not found: " .. tostring(payload.parent) } end
+	local name = tostring(payload.name or "")
+	if name == "" or string.find(name, ".", 1, true) then
+		return { ok = false, error = "name must be a non-empty path segment" }
+	end
+	local existing = parent:FindFirstChild(name)
+	if existing and payload.replace ~= true then
+		return { ok = false, error = "An instance already exists at " .. parent:GetFullName() .. "." .. name }
+	end
+
+	local instances: { Instance }? = nil
+	local loaded, loadError = pcall(function()
+		local decoded = EncodingService:Base64Decode(buffer.fromstring(payload.contentBase64))
+		instances = SerializationService:DeserializeInstancesAsync(decoded)
+	end)
+	if not loaded or not instances or #instances == 0 then
+		return { ok = false, error = "Could not deserialize model: " .. tostring(loadError or "asset contained no instances") }
+	end
+
+	local root: Instance
+	if #instances == 1 then
+		root = instances[1]
+	else
+		local container = Instance.new("Model")
+		for _, instance in instances do instance.Parent = container end
+		root = container
+	end
+	root.Name = name
+	local committed, commitError = pcall(function()
+		waypoint("Abraxius: Before import " .. name)
+		if existing then existing:Destroy() end
+		root.Parent = parent
+	end)
+	if not committed then
+		root:Destroy()
+		return { ok = false, error = "Could not commit model: " .. tostring(commitError) }
+	end
+	local verified = parent:FindFirstChild(name)
+	if verified ~= root then
+		root:Destroy()
+		return { ok = false, error = "Studio did not commit the imported model" }
+	end
+	waypoint("Abraxius: Import " .. name)
+	return {
+		ok = true, instance = instanceInfo(root), format = payload.format,
+		rootCount = #instances, descendantCount = #root:GetDescendants(), replaced = existing ~= nil,
+	}
+end
+
+commandHandlers["clone_instance"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local source = resolvePath(payload.path)
+	if not source then return { ok = false, error = "Instance not found: " .. tostring(payload.path) } end
+	local parent = if payload.parent then resolvePath(payload.parent) else source.Parent
+	if not parent then return { ok = false, error = "Clone parent not found" } end
+	local ok, clone = pcall(source.Clone, source)
+	if not ok or not clone then return { ok = false, error = tostring(clone) } end
+	clone.Name = tostring(payload.name or (source.Name .. " Copy"))
+	clone.Parent = parent
+	waypoint("Abraxius: Clone " .. source.Name)
+	return { ok = true, instance = instanceInfo(clone), source = instanceInfo(source) }
+end
+
+commandHandlers["rename_instance"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local inst = resolvePath(payload.path)
+	if not inst then return { ok = false, error = "Instance not found: " .. tostring(payload.path) } end
+	if inst == game or inst.Parent == game then return { ok = false, error = "Cannot rename a data model or service" } end
+	local name = tostring(payload.name or "")
+	if name == "" then return { ok = false, error = "name is required" } end
+	local previousPath = string.gsub(inst:GetFullName(), "^game%.", "")
+	local previousName = inst.Name
+	inst.Name = name
+	waypoint("Abraxius: Rename " .. previousName)
+	return { ok = true, previousPath = previousPath, previousName = previousName, instance = instanceInfo(inst) }
+end
+
+commandHandlers["reparent_instance"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local inst = resolvePath(payload.path)
+	local parent = resolvePath(payload.parent)
+	if not inst then return { ok = false, error = "Instance not found: " .. tostring(payload.path) } end
+	if not parent then return { ok = false, error = "Parent not found: " .. tostring(payload.parent) } end
+	if inst == game or inst.Parent == game or inst:IsA("ServiceProvider") then
+		return { ok = false, error = "Cannot reparent a data model or service" }
+	end
+	if parent:IsDescendantOf(inst) then return { ok = false, error = "Cannot parent an instance beneath itself" } end
+	local previousParent = inst.Parent
+	inst.Parent = parent
+	waypoint("Abraxius: Reparent " .. inst.Name)
+	return { ok = true, instance = instanceInfo(inst), previousParent = if previousParent then instanceInfo(previousParent) else nil }
+end
+
+commandHandlers["transform_instance"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	local inst = resolvePath(payload.path)
+	if not inst then return { ok = false, error = "Instance not found: " .. tostring(payload.path) } end
+	local target = if payload.cframe then decodeValue(payload.cframe) else nil
+	if not target and payload.position then
+		local position = decodeValue(payload.position)
+		local current = if inst:IsA("PVInstance") then inst:GetPivot() else nil
+		if current then target = CFrame.new(position) * current.Rotation end
+	end
+	if typeof(target) ~= "CFrame" then return { ok = false, error = "Provide a typed CFrame or Vector3 position" } end
+	local ok, err = pcall(function()
+		if inst:IsA("PVInstance") then
+			inst:PivotTo(target)
+		else
+			error("Instance is not transformable: " .. inst.ClassName)
+		end
+	end)
+	if not ok then return { ok = false, error = tostring(err) } end
+	waypoint("Abraxius: Transform " .. inst.Name)
+	return { ok = true, instance = instanceInfo(inst), pivot = encodeValue(inst:GetPivot()) }
+end
+
+commandHandlers["delete_instance"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	if payload.confirm ~= true then return { ok = false, error = "Deletion requires confirm=true" } end
+	local inst = resolvePath(payload.path)
+	if not inst then return { ok = false, error = "Instance not found: " .. tostring(payload.path) } end
+	if inst == game or inst.Parent == game or inst:IsA("ServiceProvider") then
+		return { ok = false, error = "Cannot delete a data model or service" }
+	end
+	local deleted = instanceInfo(inst)
+	waypoint("Abraxius: Before delete " .. inst.Name)
+	inst:Destroy()
+	waypoint("Abraxius: Delete " .. deleted.name)
+	return { ok = true, deleted = deleted }
+end
+
+local BATCH_MUTATIONS: { [string]: boolean } = {
+	write_source = true, create_script = true, set_properties = true, create_instance = true,
+	clone_instance = true, rename_instance = true, reparent_instance = true,
+	transform_instance = true, delete_instance = true,
+}
+
+commandHandlers["batch"] = function(payload: any): any
+	local editable, editError = requireEditMode()
+	if not editable then return { ok = false, error = editError } end
+	if transactionActive then return { ok = false, error = "Nested batches are not supported" } end
+	if typeof(payload.operations) ~= "table" then return { ok = false, error = "operations must be an array" } end
+	if #payload.operations == 0 then return { ok = false, error = "operations must not be empty" } end
+	if #payload.operations > 50 then return { ok = false, error = "batch is limited to 50 operations" } end
+	for index, operation in ipairs(payload.operations) do
+		local operationType = if typeof(operation) == "table" then operation.type else nil
+		if not BATCH_MUTATIONS[operationType] then
+			return { ok = false, error = "Unsupported batch operation at index " .. index .. ": " .. tostring(operationType) }
+		end
+	end
+	local recordingId = ChangeHistoryService:TryBeginRecording("AbraxiusBatch", tostring(payload.name or "Abraxius batch"))
+	if not recordingId then return { ok = false, error = "Could not begin a Studio history recording" } end
+	transactionActive = true
+	local results = {}
+	for index, operation in ipairs(payload.operations) do
+		local handler = commandHandlers[operation.type]
+		local called, result = pcall(handler, operation)
+		if not called or typeof(result) ~= "table" or result.ok ~= true then
+			transactionActive = false
+			ChangeHistoryService:FinishRecording(recordingId, Enum.FinishRecordingOperation.Cancel)
+			return {
+				ok = false, rolledBack = true, failedIndex = index,
+				error = if called then tostring(result and result.error or "Operation failed") else tostring(result),
+				results = results,
+			}
+		end
+		table.insert(results, result)
+	end
+	transactionActive = false
+	ChangeHistoryService:FinishRecording(recordingId, Enum.FinishRecordingOperation.Commit)
+	return { ok = true, committed = true, count = #results, results = results }
 end
 
 local function handleCommand(cmd: any): any
@@ -1445,6 +1900,13 @@ local function reportSourceChanged(inst: Instance)
 	local last = lastReportedSource[path]
 	if last == source then return end
 	lastReportedSource[path] = source
+	if playDataEnabled then appendBounded(analyticsScriptActivity, {
+		time = DateTime.now().UnixTimestampMillis,
+		path = path,
+		sourceLength = #source,
+		sourceHash = hashSource(source),
+		playtest = RunService:IsRunning(),
+	}, 100) end
 	local now = os.clock()
 	local pending = pendingSourceChanges[path]
 	if pending then
@@ -1611,10 +2073,17 @@ local function startActivityListeners()
 	end))
 
 	table.insert(activityConnections, LogService.MessageOut:Connect(function(message, messageType)
-		local kind = messageType.Name
-		if kind ~= "MessageWarning" and kind ~= "MessageError" then return end
-		if string.find(message, "ABRAXIUS", 1, true) or string.find(message, "[Abraxius]", 1, true) then return end
-		queueEvent({ type = "output", level = kind, message = string.sub(message, 1, 2000) })
+		if Logger.isOwnMessage(message) then return end
+		local output = classifyOutput(message, messageType)
+		if playDataEnabled then
+			appendBounded(analyticsOutput, output, 200)
+			if output.level == "error" then playSession.errors += 1
+			elseif output.level == "warning" then playSession.warnings += 1
+			else playSession.prints += 1 end
+		end
+		if output.level == "error" or output.level == "warning" then
+			queueEvent({ type = "output", level = messageType.Name, message = string.sub(message, 1, 2000) })
+		end
 	end))
 
 	table.insert(activityConnections, ChangeHistoryService.OnUndo:Connect(function(waypoint)
@@ -1654,21 +2123,39 @@ local function isHttpRestricted(err: string): boolean
 	return string.find(tostring(err), HTTP_RESTRICTED, 1, true) ~= nil
 end
 
+local function friendlyConnectionError(err: string): string
+	local clean = string.gsub(tostring(err), "^HttpError:%s*", "")
+	if clean == "ConnectFail" then return "host unavailable" end
+	return clean
+end
+
+local function logConnectionIssue(context: string, err: string)
+	local now = os.clock()
+	local clean = friendlyConnectionError(err)
+	if clean ~= lastConnectionError or now - lastConnectionLogAt >= 30 then
+		Logger.disconnect(string.format("%s; retrying in %ds (%s)", context, retryDelay, clean))
+		lastConnectionError = clean
+		lastConnectionLogAt = now
+	end
+end
+
 local function register(): boolean
 	local payload = getModePayload()
-	payload.version = "1.1.0"
+	payload.version = PLUGIN_VERSION
 	payload.sessionId = sessionId
 	local ok, result = post("/plugin/register", payload)
 	if ok and result and result.sessionId then
 		sessionId = result.sessionId
 		connected = true
 		retryDelay = 1
+		lastConnectionError = ""
+		lastConnectionLogAt = -math.huge
 		if ui.errorLabel then
 			ui.errorLabel.Text = "None"
 			ui.errorLabel.TextColor3 = PALETTE.text
 		end
 		updatePanel()
-		Logger.connect("Registered with session " .. tostring(sessionId))
+		Logger.connect("Registered session " .. tostring(sessionId))
 		return true
 	end
 	connected = false
@@ -1678,9 +2165,9 @@ local function register(): boolean
 		ui.errorLabel.TextColor3 = PALETTE.red
 	end
 	if isHttpRestricted(err) then
-		Logger.info("HTTP restricted in this datamodel; companion will retry")
+		logConnectionIssue("HTTP unavailable in this DataModel", err)
 	else
-		Logger.disconnect("Register failed: " .. err)
+		logConnectionIssue("Registration unavailable", err)
 	end
 	return false
 end
@@ -1700,6 +2187,7 @@ local function runLoop()
 		local mode = currentMode()
 		if mode ~= lastMode then
 			queueEvent({ type = "mode_changed", from = lastMode, mode = mode })
+			updatePlaySessionState()
 			lastMode = mode
 		end
 		if hierarchyChanges.added > 0 or hierarchyChanges.removed > 0 then
@@ -1716,6 +2204,13 @@ local function runLoop()
 			queueEvent({ type = "context_snapshot", snapshot = buildContextSnapshot() })
 			lastContextSnapshot = os.clock()
 		end
+		if os.clock() - lastAnalyticsSnapshot >= ANALYTICS_INTERVAL then
+			local analyticsOk = postTo(ANALYTICS_URL, "/studio", {
+				sessionId = sessionId,
+				snapshot = sampleStudioAnalytics(),
+			})
+			if analyticsOk then lastAnalyticsSnapshot = os.clock() end
+		end
 
 		local eventsToSend = eventQueue
 		eventQueue = {}
@@ -1727,7 +2222,7 @@ local function runLoop()
 			heartbeat = true,
 			isEdit = RunService:IsEdit(),
 			isRunning = RunService:IsRunning(),
-			currentDataModel = if RunService:IsEdit() then "Edit" elseif RunService:IsRunning() then "Play" else "Unknown",
+			currentDataModel = if RunService:IsRunning() then "Play" elseif RunService:IsEdit() then "Edit" else "Unknown",
 			placeId = game.PlaceId,
 		})
 
@@ -1737,9 +2232,10 @@ local function runLoop()
 		if not ok then
 			local err = tostring(result)
 			if isHttpRestricted(err) then
-				Logger.info("HTTP restricted in this datamodel; companion will retry")
+				logConnectionIssue("HTTP unavailable in this DataModel", err)
+			else
+				logConnectionIssue("Connection lost", err)
 			end
-			Logger.warn("Report failed: " .. err)
 			for i = #eventsToSend, 1, -1 do
 				table.insert(eventQueue, 1, eventsToSend[i])
 			end
@@ -1803,6 +2299,7 @@ local function init()
 	startActivityListeners()
 	lastMode = currentMode()
 	lastContextSnapshot = os.clock()
+	lastAnalyticsSnapshot = 0
 	queueEvent({ type = "context_snapshot", snapshot = buildContextSnapshot() })
 
 	plugin.Unloading:Connect(function()
@@ -1817,7 +2314,7 @@ local function init()
 	end)
 
 	task.spawn(runLoop)
-	Logger.plugin("🎮 Companion plugin started")
+	Logger.plugin("Companion ready (v" .. PLUGIN_VERSION .. ")")
 end
 
 init()

@@ -1,6 +1,6 @@
 [package]
 name = "abraxius-rs"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 description = "Rust control binary for Abraxius MCP, AI context, and Studio companion workflows"
 license = "MIT"

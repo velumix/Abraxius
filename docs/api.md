@@ -1,5 +1,9 @@
 # API Reference
 
+This page is a low-level transport reference. AI agents performing ordinary
+Studio work should start with [AI Guide: Using Abraxius](ai-usage.md) and use
+the CLI or Command Center rather than assembling HTTP requests.
+
 Abraxius exposes a local HTTP API, the Studio companion channel, sync helpers,
 and a legacy MCP compatibility listener.
 
@@ -95,9 +99,10 @@ Targeted pulls use MCP discovery and `script_read`.
 
 ## Pusher
 
-`lib/push.js` resolves a file through `place.json`. With MCP connected it uses
-MCP editing tools. Otherwise it updates an existing script through the
-companion's property command and verifies the result with `read_source`.
+`lib/push.js` resolves a file through `place.json`, reads exact source through
+the companion, automatically generates narrow MCP `multi_edit` operations, and
+verifies the result. Missing scripts are created through the same `multi_edit`
+contract. Whole-script companion fallback is disabled.
 
 ```js
 const { Pusher } = require("./lib/push");
@@ -107,7 +112,7 @@ const result = await pusher.push(
 );
 ```
 
-Companion fallback does not create missing script instances.
+Callers only provide the mapped filename; they do not construct edit payloads.
 
 ## Legacy MCP bridge
 

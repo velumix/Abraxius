@@ -144,6 +144,10 @@ class MCPClient {
     return request("POST", "/pending/verify", {});
   }
 
+  async pendingRecord(path, source) {
+    return request("POST", "/pending/record", { path, source });
+  }
+
   async pendingClear(path) {
     return request("POST", "/pending/clear", path ? { path } : {});
   }

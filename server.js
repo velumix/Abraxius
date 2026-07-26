@@ -425,6 +425,17 @@ async function createServer(bridge) {
           sendJson(res, 200, { pushes: pendingPushes.list() });
           break;
 
+        case "POST /pending/record": {
+          const body = await readBody(req);
+          if (!body.path || typeof body.source !== "string") {
+            sendJson(res, 400, { error: "Missing path or source" });
+            break;
+          }
+          const push = pendingPushes.recordPush(body.path, body.source);
+          sendJson(res, 200, { ok: true, push });
+          break;
+        }
+
         case "POST /pending/verify": {
           const pushes = pendingPushes.list().filter((p) => p.status !== "committed");
           const verified = [];

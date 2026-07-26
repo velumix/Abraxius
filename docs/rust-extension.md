@@ -60,15 +60,15 @@ The app follows the Windows system theme using WinUI theme resources and Mica.
 | Command | Description |
 |---|---|
 | `status` | Read daemon health |
-| `start` | Start the native daemon in the background |
-| `start-node` | Start the legacy Node daemon |
-| `stop` | Shut down the active daemon |
-| `tools`, `state`, `call`, `execute` | Use connected MCP tools |
+| `start` | Confirm the app-owned host is running |
+| `stop` | Direct shutdown back to the app window or tray |
+| `tools`, `state`, `call`, `execute` | Use connected MCP tools; file/stdin payloads supported |
 | `plugin ...` | Inspect or command the companion |
 | `pending ...` | Read or verify tracked pushes |
 | `ai-context` | Build an AI briefing |
 | `remember`, `memory` | Manage durable project memory |
 | `install-plugin` | Install the companion plugin |
 
-The Node CLI remains the high-level interface for project pull and push. It
-uses the API hosted by the app's Rust daemon.
+Both CLIs are clients of the app-owned Rust daemon. Neither CLI starts a
+background host, launches the legacy Node daemon, or shuts down the app-owned
+host. The Node CLI remains the high-level interface for project pull and push.

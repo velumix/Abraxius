@@ -4,9 +4,43 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
     <Application.Resources>
         <ResourceDictionary>
+            <ResourceDictionary.ThemeDictionaries>
+                <ResourceDictionary x:Key="Default">
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#6C4DFF" />
+                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="#176C4DFF" />
+                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#C8FFFFFF" />
+                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="#E8FFFFFF" />
+                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="#24000000" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="Dark">
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#9C86FF" />
+                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="#269C86FF" />
+                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#98212121" />
+                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="#C02A2A2A" />
+                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="#28FFFFFF" />
+                </ResourceDictionary>
+                <ResourceDictionary x:Key="HighContrast">
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                </ResourceDictionary>
+            </ResourceDictionary.ThemeDictionaries>
             <ResourceDictionary.MergedDictionaries>
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
+            <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
+                <Setter Property="FontSize" Value="28" />
+                <Setter Property="FontWeight" Value="SemiBold" />
+            </Style>
+            <Style x:Key="SectionCardStyle" TargetType="Border">
+                <Setter Property="Padding" Value="18" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Background" Value="{ThemeResource GlassSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource GlassStrokeBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>

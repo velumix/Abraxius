@@ -14,7 +14,7 @@ supervises the Studio companion connection.
   `.luau`, `.server.luau`, and `.client.luau` files.
 - **HTTP API and CLIs**: Expose daemon health, companion commands, AI context,
   memory, sync, and optional MCP calls to local tools.
-- **Codex skill**: Provides a guarded pull, edit, push, and read-back workflow.
+- **Codex skill**: Provides a guarded pull, edit, push, and pending-tracking workflow.
 
 ## Architecture
 
@@ -30,10 +30,11 @@ node cli.js / abraxius.exe --HTTP--> 127.0.0.1:13470
                               +-- legacy MCP listener --> ws://127.0.0.1:13469/studio
 ```
 
-The companion path is the reliable path for full-place pull, live inspection,
-source read-back, and updates to existing scripts. The legacy MCP listener
-remains available, but current Roblox releases use `StudioMCP.exe` over stdio
-and require a future transport integration for generic MCP tools.
+The companion path handles full-place pull, live inspection, and committed
+source reads. Script push combines an initial companion read with MCP
+`multi_edit`; changed scripts are tracked as pending without immediate read-back
+so Draft Mode cannot block the push. It requires both connections. The legacy
+MCP listener remains for compatibility with earlier Studio transports.
 
 ## Quick start
 
@@ -48,5 +49,6 @@ node cli.js pull game
 node cli.js push game\src\ServerScriptService\KnitServer.server.luau
 ```
 
-See [Windows App](windows-app.md), [Sync Workflow](sync.md), and
-[Codex Skill](codex-skill.md) for the complete workflows.
+AI agents should start with [AI Guide: Using Abraxius](ai-usage.md). Human-facing
+details continue in [Windows App](windows-app.md), [Sync Workflow](sync.md), and
+[CLI Reference](cli.md).
