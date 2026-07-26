@@ -1,6 +1,9 @@
 # Abraxius
 
-Built by **VELUMIX**.
+[![MIT License](https://img.shields.io/badge/license-MIT-6d28d9.svg)](LICENSE)
+[![Documentation](https://github.com/velumix/Abraxius/actions/workflows/deploy.yml/badge.svg)](https://velumix.github.io/Abraxius/)
+
+Build in code. Verify in Studio.
 
 Abraxius is a Windows-hosted Roblox Studio companion and verified Luau script
 sync system. Its packaged WinUI 3 app keeps a Rust daemon active in the taskbar
@@ -9,6 +12,12 @@ Studio, pull projects, push existing script edits, and build AI context.
 
 Current tested release: **Abraxius App 1.14.5**, **Studio companion 1.8.1**,
 and **companion protocol 6**.
+
+## Documentation
+
+Read the [Abraxius documentation](https://velumix.github.io/Abraxius/) for
+installation, Studio sync, the Windows app, AI workflows, AXL, and the complete
+CLI and local API references.
 
 ## Components
 

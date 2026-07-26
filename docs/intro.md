@@ -1,55 +1,132 @@
-# Introduction
+---
+sidebar_position: 1
+sidebar_label: Start here
+---
 
-Abraxius is a Windows-hosted Roblox Studio companion and script-sync system. A
-packaged WinUI 3 app keeps the Rust daemon active, exposes a local HTTP API, and
-supervises the Studio companion connection.
+# Getting started
 
-## What it does
+Abraxius connects professional local development tools to the Roblox Studio
+session you are actually working in. It can inspect the live DataModel, export
+a place as a mapped Luau project, apply narrow source edits, and keep every
+connected AI tool grounded in verified Studio state.
 
-- **Windows app**: Runs in the taskbar and notification area, follows the system
-  theme, starts the Rust daemon, and can launch with Windows.
-- **Studio companion**: Inspects instances, reads script sources, exports the
-  open place, reports activity, and applies verified updates to existing scripts.
-- **Script sync**: Maps Roblox services and scripts to `place.json` plus familiar
-  `.luau`, `.server.luau`, and `.client.luau` files.
-- **HTTP API and CLIs**: Expose daemon health, companion commands, AI context,
-  memory, sync, and optional MCP calls to local tools.
-- **AI agent workflow**: Provides model-neutral guarded pull, edit, push, and
-  pending-tracking instructions for any AI integration.
+Studio remains the authority. Abraxius observes first, previews mutations, and
+tracks source changes until Roblox confirms the committed result.
 
-## Architecture
+:::tip The short version
+Use Abraxius when you want to edit Roblox projects outside Studio without
+giving up Studio-aware validation, selection, history, and Draft Mode safety.
+:::
+
+## What ships together
+
+| Layer | Responsibility |
+| --- | --- |
+| Abraxius.App | Runs the Windows workspace, tray process, settings, diagnostics, editor, and approval surfaces |
+| Rust host | Owns the local API, process health, companion queue, and persistent app connection |
+| Studio companion | Reads the live DataModel, exports scripts, reports Studio activity, and applies supported operations |
+| Node and Rust CLIs | Give people, scripts, and coding agents a stable command surface |
+| AI workflow | Combines Studio context, project memory, GitHub context, guarded edits, and pending verification |
+
+## How the pieces connect
 
 ```text
-Abraxius.App (WinUI 3)
-        |
-        +-- supervises --> abraxius-daemon.exe
-                              |
-node cli.js / abraxius.exe --HTTP--> 127.0.0.1:13470
-                              |
-                              +-- companion long-poll --> Studio plugin :13471
-                              |
-                              +-- legacy MCP listener --> ws://127.0.0.1:13469/studio
+Local editor or coding agent
+            |
+            v
+Node CLI / Rust CLI / Abraxius.App
+            |
+            v
+App-owned Rust host on 127.0.0.1:13470
+            |
+            +---- Studio companion on :13471
+            |          |
+            |          v
+            |     Live Roblox DataModel
+            |
+            +---- Legacy MCP listener on :13469
 ```
 
-The companion path handles full-place pull, live inspection, and committed
-source reads. Script push combines an initial companion read with MCP
-`multi_edit`; changed scripts are tracked as pending without immediate read-back
-so Draft Mode cannot block the push. It requires both connections. The legacy
-MCP listener remains for compatibility with earlier Studio transports.
+The app is the only host supervisor. CLIs connect to it as clients and never
+start a competing daemon. The Studio companion owns live inspection and
+full-place export. Source pushes use revision-aware `multi_edit` operations and
+remain tracked when Draft Mode delays committed source visibility.
 
-## Quick start
+## Install and connect
 
 ```powershell
+git clone https://github.com/velumix/Abraxius.git
+cd Abraxius
 npm install
 npm run rust:build
 npm run install-plugin
 npm run app:run
-
-node cli.js plugin status
-node cli.js pull game
-node cli.js push game\src\ServerScriptService\KnitServer.server.luau
 ```
 
-AI agents should start with [AI Guide: Using Abraxius](ai-usage.md). Human-facing
-details continue in [Windows App](windows-app.md), [Sync Workflow](sync.md), and
-[CLI Reference](cli.md).
+Enable **Allow HTTP Requests** in Roblox Studio under **Game Settings >
+Security**, then open a place and verify the connection:
+
+```powershell
+node cli.js status
+node cli.js plugin status
+node cli.js plugin inspect Workspace
+```
+
+See [Installation](installation.md) for requirements, Windows package setup,
+and connection troubleshooting.
+
+## Pull your first project
+
+Export the open place into a dedicated folder:
+
+```powershell
+node cli.js pull game
+```
+
+Abraxius writes a `place.json` mapping and a familiar source tree:
+
+```text
+game/
+|-- place.json
+`-- src/
+    |-- ReplicatedStorage/
+    |-- ServerScriptService/
+    `-- Workspace/
+```
+
+Edit a mapped script locally, then push that exact file once:
+
+```powershell
+node cli.js push game\src\ServerScriptService\Main.server.luau
+```
+
+A result with `verified: true` is complete. A result with `pending: true` is
+also accepted and is waiting for a Studio Draft Mode commit. Do not retry a
+pending push.
+
+Read [Sync workflow](sync.md) before using source push in a production place.
+
+## Give an AI verified context
+
+Generate one compact briefing with Studio state, project memory, pending
+changes, and GitHub repository activity:
+
+```powershell
+node cli.js ai-context
+```
+
+Coding agents should read [AI workflow](ai-usage.md) before changing a mapped
+script. The guide defines the inspection, edit, push, and verification contract
+for every model or agent host.
+
+## Choose your next guide
+
+| Goal | Continue with |
+| --- | --- |
+| Install the Windows app and Studio plugin | [Installation](installation.md) |
+| Understand the desktop workspace | [Windows app](windows-app.md) |
+| Pull, edit, and push scripts safely | [Sync workflow](sync.md) |
+| Connect an AI coding agent | [AI workflow](ai-usage.md) |
+| Read repository and Actions context | [GitHub context](github-context.md) |
+| Use compact live Studio commands | [AXL command language](axl.md) |
+| Integrate another local tool | [Local API reference](api.md) |

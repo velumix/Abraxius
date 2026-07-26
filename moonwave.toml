@@ -1,12 +1,16 @@
 title = "Abraxius"
-description = "Abraxius - Windows host, Studio companion, and verified script sync for Roblox Studio"
+description = "Verified Roblox Studio sync, live inspection, and AI-assisted development"
+gitRepoUrl = "https://github.com/velumix/Abraxius"
+gitSourceBranch = "main"
+changelog = false
 
 [docusaurus]
-title = "Abraxius"
-tagline = "Windows host, Studio companion, and verified script sync for Roblox Studio"
-baseUrl = "/Abraxius/"
 organizationName = "velumix"
 projectName = "abraxius"
+url = "https://velumix.github.io"
+baseUrl = "/Abraxius/"
+tagline = "Build in code. Verify in Studio."
+onBrokenLinks = "throw"
 
 [navbar]
 title = "Abraxius"
@@ -16,21 +20,32 @@ enabled = true
 includeReadme = true
 
 [[home.features]]
-title = "Windows Host"
-description = "Keep the Rust daemon active from a themed WinUI 3 app with taskbar, tray, startup, and server lifecycle controls."
+title = "Verified Studio sync"
+description = "Pull complete Luau projects, push narrow source edits, and track Draft Mode until Studio commits the result."
 
 [[home.features]]
-title = "AI Context Memory"
-description = "Give AI sessions one clear briefing with pinned project memory, recent operations, pending pushes, and Studio companion events."
+title = "Live development context"
+description = "Inspect the active DataModel, selection, scripts, output, GitHub repository, and recent operations from one local host."
 
 [[home.features]]
-title = "Studio Companion"
-description = "Inspect the live DataModel, export scripts, track Studio activity, and verify source through the companion channel."
+title = "Guarded AI workflows"
+description = "Give any coding agent a compact briefing and a revision-aware path from local edit to approved Studio mutation."
 
-[[home.features]]
-title = "Script Sync"
-description = "Pull complete Luau projects and push existing script edits back through the companion with read-back verification."
+[[footer.links]]
+title = "Abraxius"
 
-[[home.features]]
-title = "Codex Skill"
-description = "Use the repository-local Abraxius Studio Sync skill for guarded pull, edit, push, verification, and recovery workflows."
+[[footer.links.items]]
+label = "Documentation"
+href = "https://velumix.github.io/Abraxius/"
+
+[[footer.links.items]]
+label = "GitHub"
+href = "https://github.com/velumix/Abraxius"
+
+[[footer.links.items]]
+label = "License"
+href = "https://github.com/velumix/Abraxius/blob/main/LICENSE"
+
+[footer]
+style = "dark"
+copyright = "Abraxius is open-source software released under the MIT License."

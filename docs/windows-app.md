@@ -1,8 +1,28 @@
+---
+sidebar_position: 3
+sidebar_label: Windows app
+---
+
 # Windows App
 
 Abraxius.App is a packaged WinUI 3 supervisor for the Rust daemon. It follows
 the Windows light, dark, and high-contrast themes and uses the project `Logo`
 and `Tray` assets for its app and notification-area identities.
+
+| Area | Purpose |
+|---|---|
+| Home | See whether the host, Studio, and companion are ready |
+| Activity | Follow the current playtest and recent runtime output |
+| Intelligence | Review persistent Studio signals, correlations, and suggestions |
+| Sync and Code | Pull, edit, preview, approve, and verify Luau changes |
+| Commands | Discover companion operations and manage the approval queue |
+| AI | Chat with local models using only the context you choose |
+| Diagnostics | Inspect categorized logs and create a redacted support bundle |
+
+:::tip
+Closing the window keeps Abraxius and its daemon running. Use **Quit Abraxius**
+from the notification-area menu when you want to stop both processes.
+:::
 
 Workspace pages use the full available width and height. Home and Sync cards
 stack at compact widths, Commands moves its approval queue below the command

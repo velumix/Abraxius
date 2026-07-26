@@ -1,3 +1,8 @@
+---
+sidebar_position: 11
+sidebar_label: Rust host
+---
+
 # Rust Host and WinUI App
 
 Abraxius includes two Rust binaries and a packaged WinUI 3 frontend:

@@ -1,3 +1,8 @@
+---
+sidebar_position: 12
+sidebar_label: Agent skill
+---
+
 # AI Agent Skill
 
 Abraxius provides model-neutral operating instructions in:

@@ -1,3 +1,8 @@
+---
+sidebar_position: 5
+sidebar_label: AI workflow
+---
+
 # AI Guide: Using Abraxius
 
 This is the canonical operating guide for an AI working in the Abraxius

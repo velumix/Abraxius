@@ -1,3 +1,8 @@
+---
+sidebar_position: 6
+sidebar_label: AI context and memory
+---
+
 # AI Context and Memory
 
 Abraxius makes AI context explicit. Instead of asking an AI agent to infer the

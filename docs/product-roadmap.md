@@ -1,3 +1,8 @@
+---
+sidebar_position: 13
+sidebar_label: Product roadmap
+---
+
 # Abraxius Workspace Roadmap
 
 This checklist tracks the evolution of Abraxius from a Studio supervisor into
