@@ -7,20 +7,48 @@ sync system. Its packaged WinUI 3 app keeps a Rust daemon active in the taskbar
 and notification area while thin local CLIs ask the app-owned host to inspect
 Studio, pull projects, push existing script edits, and build AI context.
 
+Current tested release: **Abraxius App 1.14.5**, **Studio companion 1.8.1**,
+and **companion protocol 6**.
+
 ## Components
 
 - **Abraxius.App**: System-themed WinUI 3 supervisor with taskbar, tray,
   startup, restart, and full quit controls.
 - **Rust daemon**: Local health and control API on `13470`, companion channel
   on `13471`, and legacy MCP listener on `13469`.
-- **Studio companion**: Live inspection, selection, script export, source
-  read-back, activity reporting, and existing-script updates.
+- **Studio companion**: Roblox-side authority for live inspection, selection,
+  script export, source revisions, AXL parsing and execution, edits,
+  ChangeHistory, and Draft Mode detection.
 - **Node CLI**: Thin app-host client for high-level pull, push, context, memory,
   AXL, and optional MCP tools.
 - **Rust CLI**: Thin native client for status, companion, pending-push, and
   context commands.
 - **Codex skill**: Repository-local guarded sync workflow at
   `.codex/skills/abraxius-studio-sync`.
+
+## Control model
+
+```text
+AI or CLI
+    |
+    v
+Abraxius App-owned Rust host
+    |
+    v
+Roblox Studio companion
+    |
+    v
+Live Roblox DataModel
+```
+
+The app is the only host supervisor. The Node and Rust CLIs are thin clients:
+they cannot start a competing daemon or stop the app-owned host. Start,
+restart, stop, and quit are controlled from the Abraxius window or tray menu.
+
+The Studio companion performs work that depends on live Roblox state. It
+resolves instances, reads source, computes revisions, applies AXL patches with
+`ScriptEditorService`, records ChangeHistory operations, and reports whether
+Draft Mode accepted an edit as pending.
 
 Tell Codex to **use Abraxius** (or explicitly name
 `$abraxius-studio-sync`). For a normal script change, Codex edits the mapped
@@ -74,6 +102,68 @@ node cli.js plugin call read_source '{"path":"game.ServerScriptService.KnitServe
 ```
 
 The companion can be connected while the legacy MCP status is waiting.
+
+## AXL: compact AI commands
+
+AXL is Abraxius's compact, typed AI command language. The CLI transports the
+original text through the app-owned host; the Studio companion parses and
+executes it.
+
+```powershell
+node cli.js axl 'hello axl/1'
+node cli.js axl 'state'
+node cli.js axl 'find "EndRound" budget=500'
+node cli.js axl 'read ServerScriptService.KnitServer summary'
+```
+
+Example compact responses:
+
+```text
+READY axl/1 ns=0 tools=core,studio
+SUM ServerScriptService.KnitServer@3337966330 lines=15 bytes=605 symbols=0
+```
+
+Revision-safe patches use an exact old/new heredoc:
+
+```text
+patch ServerScriptService.MatchManager@308937084
+old <<OLD
+local speed = 10
+OLD
+new <<NEW
+local speed = 20
+NEW
+```
+
+Use `node cli.js axl --file .\change.axl` or `--stdin` for multiline commands.
+An accepted Draft Mode edit returns `pending=1`; do not retry or read it back
+until the user commits the draft. See [docs/axl.md](docs/axl.md) for the full
+AXL/1 grammar.
+
+## Command Center
+
+The app's **Commands** page discovers the live companion schema. Commands can
+be reviewed, queued, saved as workflows, or drafted by the configured AI
+provider. Mutations always require approval.
+
+For an explicitly requested manual replacement, Command Center exposes compact
+`multi_edit` JSON:
+
+```json
+{
+  "file_path": "game.ServerScriptService.Main",
+  "edits": [
+    {
+      "old_string": "local speed = 10",
+      "new_string": "local speed = 20"
+    }
+  ]
+}
+```
+
+The app injects `datamodel_type: "Edit"` and sends the command through MCP.
+For normal mapped-file work, use `node cli.js push <file>` instead so Abraxius
+generates the exact granular edits and tracks Draft Mode.
 
 ## Pull
 
@@ -170,11 +260,18 @@ The static site is generated into `build/`.
 ## Validation
 
 ```powershell
+npm test
+npm run plugin:build
 npm run smoke
 npm run rust:check
 npm run app:build
 npm run docs:build
 ```
+
+The AXL write path was also tested live in Studio: create a disposable
+ModuleScript, read its revision, apply an exact patch, receive `pending=1`,
+commit the draft, verify the predicted revision and source, and delete the
+artifact. The final companion queue was empty.
 
 ## License
 
