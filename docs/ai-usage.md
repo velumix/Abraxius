@@ -14,6 +14,7 @@ needed.
 | Run a manual app command | **Commands** page in Abraxius.App |
 | Apply exact manual replacements | Command Center `multi_edit` |
 | Read session context | `node cli.js ai-context` |
+| Read GitHub repository context | `node cli.js github-context` |
 | Send compact AI commands | `node cli.js axl <command>`; the Studio plugin executes them |
 | Diagnose connections | `node cli.js status` and `node cli.js plugin status` |
 
@@ -180,6 +181,33 @@ node cli.js execute --file .\diagnostic.luau
 
 For normal mapped script updates, avoid source-bearing JSON entirely: edit the
 local file and use `push`.
+
+## GitHub repository context
+
+Run the command inside a GitHub checkout to discover its `origin`:
+
+```powershell
+node cli.js github-context
+node cli.js github-context --json
+```
+
+Pass another public repository explicitly when needed:
+
+```powershell
+node cli.js github-context velumix/Nerve
+```
+
+The provider uses GitHub's REST API to read repository metadata, the latest
+default-branch commit and release, open pull requests, and recent Actions runs.
+Public repositories work without authentication at GitHub's lower anonymous
+rate limit. Set `GITHUB_TOKEN` or `GH_TOKEN` for private repositories or higher
+limits. Tokens are read from the environment and are not persisted or included
+in output.
+
+`ai-context` automatically appends this data when the active project has a
+GitHub origin. GitHub API failure does not block Studio context, but the direct
+`github-context` command reports authentication, permission, and repository
+errors.
 
 ## Safety and completion rules
 

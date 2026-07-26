@@ -19,6 +19,8 @@ complete operating workflow.
 - current selection, active/open scripts, service sizes, script counts, and tags
 - source hashes, hierarchy batches, play-mode transitions, warnings, and errors
 - ChangeHistory recordings, undo, and redo activity
+- GitHub repository metadata, pull requests, releases, commits, and Actions
+  runs when the project has a GitHub origin
 
 Source changes are debounced into edit sessions after 1.25 seconds of inactivity.
 Each event includes the original and final source hashes, final source length,
@@ -29,6 +31,33 @@ Use JSON when another tool needs structured data:
 ```bash
 node cli.js ai-context --json
 ```
+
+## GitHub context
+
+Read only the repository briefing:
+
+```bash
+node cli.js github-context
+node cli.js github-context --json
+node cli.js github-context velumix/Nerve
+```
+
+Abraxius discovers the repository from the nearest Git checkout's `origin`.
+Public repositories work anonymously. Set `GITHUB_TOKEN` or `GH_TOKEN` when
+private access or a higher API rate limit is needed. The token is read from the
+environment and never stored or returned in the briefing.
+
+The provider uses Octokit and GitHub's versioned REST API. It collects:
+
+- repository description, visibility, default branch, license, stars, and forks
+- the latest commit on the default branch
+- up to five recently updated open pull requests
+- up to five recent GitHub Actions runs
+- the latest published release when one exists
+
+GitHub context is best effort inside `ai-context`, so a network or permission
+failure never prevents Studio context from loading. Use `github-context`
+directly when an API failure should stop the command and return an error.
 
 ## Pin durable memory
 

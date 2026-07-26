@@ -1,6 +1,6 @@
 {
   "name": "abraxius",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "description": "AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio",
   "main": "client.js",
   "bin": {
@@ -40,6 +40,7 @@
   "author": "Velumix",
   "license": "MIT",
   "dependencies": {
+    "octokit": "^5.0.5",
     "ws": "^8.18.0"
   },
   "devDependencies": {

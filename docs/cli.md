@@ -30,7 +30,7 @@ host. Start, restart, stop, and quit belong to the app window or tray menu.
 | `axl --stdin` | Read exact AXL from standard input |
 | `axl --ast <text>` | Parse and print the typed JSON AST without execution |
 
-See [AXL — Abraxius Exchange Language](axl.md) for the grammar, revision-safe
+See [AXL: Abraxius Exchange Language](axl.md) for the grammar, revision-safe
 patch form, compact responses, and currently reserved features.
 
 ## Companion
@@ -122,7 +122,8 @@ connected. Companion commands and full sync remain available independently.
 | Command | Description |
 |---|---|
 | `context` | Show or set session context |
-| `ai-context [--json] [--project <dir>]` | Print an AI briefing |
+| `ai-context [--json] [--project <dir>]` | Print a Studio and GitHub AI briefing |
+| `github-context [owner/repo] [--json] [--project <dir>]` | Read GitHub REST API context |
 | `remember <text> [options]` | Pin durable project memory |
 | `memory` | List pinned memory |
 | `memory clear [id]` | Clear one or all entries |
