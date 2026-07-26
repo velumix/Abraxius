@@ -12,7 +12,7 @@ a safe, AI-assisted Roblox development workspace.
 - [ ] Bound agents by project roots, Studio paths, commands, and time budgets.
 - [ ] Preserve a complete local history of commands, diffs, and outcomes.
 
-## Phase 1 — Command workspace
+## Phase 1: Command workspace
 
 - [x] Add a dedicated Commands destination to the Windows app.
 - [x] Discover commands from the companion's machine-readable schemas.
@@ -28,7 +28,7 @@ a safe, AI-assisted Roblox development workspace.
 - [x] Add an approval queue with atomic batches for compatible operations.
 - [x] Persist command history with redaction and retention controls.
 
-## Phase 2 — Code workspace
+## Phase 2: Code workspace
 
 - [x] Embed a locally bundled Monaco editor through WebView2 with Luau syntax support.
 - [x] Add a synchronized Studio script explorer with filtering and refresh.
@@ -40,7 +40,7 @@ a safe, AI-assisted Roblox development workspace.
 - [x] Add formatting and diagnostics adapters for StyLua and Luau tooling.
 - [x] Add file/session recovery and unsaved-buffer guards.
 
-## Phase 3 — AI provider platform
+## Phase 3: AI provider platform
 
 - [x] Define provider-neutral model discovery, streaming chat, and cancellation contracts.
 - [ ] Add an OpenAI-compatible HTTP provider.
@@ -56,7 +56,7 @@ a safe, AI-assisted Roblox development workspace.
 - [x] Add schema-validated AI command proposals routed into the approval queue.
 - [x] Keep the initial provider workspace read-only with no shell, filesystem, or mutation tools.
 
-## Phase 4 — Studio intelligence
+## Phase 4: Studio intelligence
 
 - [x] Create a timeline for edit/play/server/client transitions.
 - [x] Detect new errors, warning spikes, and repeated stack traces.
@@ -67,7 +67,7 @@ a safe, AI-assisted Roblox development workspace.
 - [x] Escalate to a larger model only when explicitly requested.
 - [x] Add quiet hours, notification thresholds, and per-signal controls.
 
-## Phase 5 — Safe agent mode
+## Phase 5: Safe agent mode
 
 - [ ] Support Observe, Assist, and Agent operating modes.
 - [ ] Add Studio-path and local-project allowlists.

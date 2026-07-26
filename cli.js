@@ -14,6 +14,10 @@ const {
   loadMemory,
   toMarkdown,
 } = require("./lib/ai-context");
+const {
+  fetchGitHubContext,
+  toGitHubMarkdown,
+} = require("./lib/github-context");
 
 const studioEmoji = {
   tools: String.fromCodePoint(0x1f9f0),
@@ -60,7 +64,10 @@ Context:
   context project <dir> Set active project directory
   context datamodel <dm> Set preferred datamodel (Edit/Client/Server)
   ai-context [--json] [--project <dir>]
-                        Print one AI-readable briefing with memory + live context
+                        Print one AI-readable briefing with Studio + GitHub context
+  github-context [owner/repo] [--json] [--project <dir>]
+                        Read repository, PR, release, and Actions context from
+                        the GitHub REST API. Uses GITHUB_TOKEN or GH_TOKEN when set.
   remember <text> [--tag <tag>] [--path <path>] [--project <dir>]
                         Pin a durable project fact for future AI sessions
   memory                List pinned project memory
@@ -314,6 +321,10 @@ async function main() {
       case "ai-context": {
         const opts = parseOptions(args);
         const projectDir = opts.projectDir || process.cwd();
+        let github = null;
+        try {
+          github = await fetchGitHubContext({ projectDir });
+        } catch {}
         if (await probeDaemon()) {
           try {
             const client = new MCPClient();
@@ -321,12 +332,38 @@ async function main() {
               projectDir,
               format: opts.json ? "json" : "markdown",
             });
-            console.log(typeof result === "string" ? result : JSON.stringify(result, null, 2));
+            if (typeof result === "string") {
+              console.log(
+                github
+                  ? `${result.trimEnd()}\n\n${toGitHubMarkdown(github)}`
+                  : result,
+              );
+            } else {
+              if (github) result.github = github;
+              console.log(JSON.stringify(result, null, 2));
+            }
             break;
           } catch {}
         }
         const snapshot = buildAiContext({ projectDir });
+        if (github) snapshot.github = github;
         console.log(opts.json ? JSON.stringify(snapshot, null, 2) : toMarkdown(snapshot));
+        break;
+      }
+
+      case "github":
+      case "github-context": {
+        const opts = parseOptions(args);
+        const projectDir = opts.projectDir || process.cwd();
+        const github = await fetchGitHubContext({
+          projectDir,
+          repository: opts._[0],
+        });
+        console.log(
+          opts.json
+            ? JSON.stringify(github, null, 2)
+            : toGitHubMarkdown(github),
+        );
         break;
       }
 

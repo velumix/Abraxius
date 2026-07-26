@@ -27,6 +27,8 @@ and **companion protocol 6**.
   `docs/ai-usage.md`, with the reusable skill package in
   `skills/abraxius-studio-sync` and host-specific discovery adapters kept
   separate.
+- **GitHub context provider**: Read-only repository, pull request, release,
+  commit, and Actions context through GitHub's REST API.
 
 ## Control model
 
@@ -56,7 +58,7 @@ Tell any connected AI client or agent to **use Abraxius**. Skill-aware clients
 can explicitly invoke `$abraxius-studio-sync`; other clients can read
 `AGENTS.md` and `docs/ai-usage.md` or call the same CLI and local API directly.
 For a normal script change, the agent edits the mapped local file and runs one
-`node cli.js push <file>` command. Abraxius—not the model—calculates
+`node cli.js push <file>` command. Abraxius, not the model, calculates
 `multi_edit` operations. Changed scripts are tracked as `pending` until Studio
 commits them; agents must not retry or immediately read them back while Draft
 Mode can hide the uncommitted source.
@@ -231,11 +233,18 @@ node cli.js remember "KnitServer owns service startup." --tag architecture `
   --path ServerScriptService.KnitServer
 node cli.js memory
 node cli.js ai-context
+node cli.js github-context
 ```
 
 Pinned memory is stored in `.abraxius/memory.json`. Context briefings also
 include companion state, recent Studio activity, scripts, operations, and
-pending pushes.
+pending pushes. When the project has a GitHub origin, the briefing includes
+repository metadata, open pull requests, the latest release and default-branch
+commit, and recent Actions runs.
+
+GitHub context works anonymously for public repositories. Set `GITHUB_TOKEN` or
+`GH_TOKEN` for private repositories and higher rate limits. Abraxius reads the
+token from the process environment and never stores or prints it.
 
 ## MCP compatibility
 

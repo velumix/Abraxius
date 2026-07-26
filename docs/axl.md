@@ -1,4 +1,4 @@
-# AXL — Abraxius Exchange Language
+# AXL: Abraxius Exchange Language
 
 AXL is a compact, typed command language for AI-to-Abraxius communication. It
 is deliberately not a general-purpose programming language. The Roblox Studio
