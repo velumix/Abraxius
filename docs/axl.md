@@ -1,3 +1,8 @@
+---
+sidebar_position: 8
+sidebar_label: AXL command language
+---
+
 # AXL: Abraxius Exchange Language
 
 AXL is a compact, typed command language for AI-to-Abraxius communication. It

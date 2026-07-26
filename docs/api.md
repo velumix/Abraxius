@@ -1,3 +1,8 @@
+---
+sidebar_position: 10
+sidebar_label: Local API reference
+---
+
 # API Reference
 
 This page is a low-level transport reference. AI agents performing ordinary

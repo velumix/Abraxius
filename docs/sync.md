@@ -1,3 +1,8 @@
+---
+sidebar_position: 4
+sidebar_label: Sync workflow
+---
+
 # Sync Workflow
 
 Abraxius can extract scripts from Studio into a local project and push local
@@ -5,6 +10,23 @@ edits back. The layout uses standard Roblox Luau file extensions so scripts map
 cleanly between the filesystem and Studio. AI agents should read [AI Guide:
 Using Abraxius](ai-usage.md) first; this page contains detailed mapping and
 Draft Mode behavior.
+
+The normal loop is short:
+
+```text
+Pull from Studio -> edit local Luau -> push one file -> commit in Studio -> verify
+```
+
+```bash
+node cli.js pull game
+node cli.js push game/src/ServerScriptService/MatchManager.server.luau
+node cli.js pending verify
+```
+
+:::important
+A successful script push can be `pending` while Roblox Studio Draft Mode holds
+the edit. Do not retry it. Commit the draft in Studio, then verify it.
+:::
 
 ## Pull
 

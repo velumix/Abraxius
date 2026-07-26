@@ -1,3 +1,8 @@
+---
+sidebar_position: 9
+sidebar_label: CLI reference
+---
+
 # CLI Reference
 
 AI agents should choose a workflow with [AI Guide: Using
