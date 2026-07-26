@@ -1,20 +1,26 @@
 # Sync Workflow
 
-Abraxius can extract scripts from Studio into a local project and push local edits back. The layout uses standard Roblox Luau file extensions so scripts map cleanly between your filesystem and the Studio DataModel.
+Abraxius can extract scripts from Studio into a local project and push local
+edits back. The layout uses standard Roblox Luau file extensions so scripts map
+cleanly between the filesystem and Studio. AI agents should read [AI Guide:
+Using Abraxius](ai-usage.md) first; this page contains detailed mapping and
+Draft Mode behavior.
 
 ## Pull
 
-`mcp pull <dir>` extracts scripts from the connected Studio instance. Discovery and reads run in parallel with a small rate limit so large places finish quickly without hammering Studio.
+`node cli.js pull <dir>` asks the Studio companion for one bulk script export, including
+source and `RunContext` metadata. If the companion is unavailable or outdated,
+it falls back to the parallel MCP crawler.
 
 ```bash
 # Pull everything
-mcp pull game
+node cli.js pull game
 
 # Pull one script
-mcp pull --target ServerScriptService.MatchManager game
+node cli.js pull --target ServerScriptService.MatchManager game
 
 # Pull a list of targets from a file, one Studio path per line
-mcp pull --targets-file targets.txt game
+node cli.js pull --targets-file targets.txt game
 ```
 
 A typical pulled project looks like this:
@@ -53,6 +59,7 @@ my-game/
 | `init.server.luau` | `Script` with children |
 | `init.client.luau` | `LocalScript` with children |
 | `init.luau` | `ModuleScript` with children |
+| `.rbxm` / `.rbxmx` | Imported instance tree (push only) |
 
 ## place.json
 
@@ -75,44 +82,65 @@ my-game/
 After editing a pulled script locally, push it back to Studio:
 
 ```bash
-mcp push game/src/ServerScriptService/MatchManager.server.luau
+node cli.js push game/src/ServerScriptService/MatchManager.server.luau
+node cli.js push game/src/Workspace/MainModule.rbxm
 ```
 
-This resolves the local file back to `game.ServerScriptService.MatchManager`, reads the current Studio source, and applies a `multi_edit` with your changes. If the file has not changed, nothing is sent.
+Script pushes require both the MCP transport and the connected Studio
+companion. Abraxius refuses the push when either is unavailable instead of
+falling back to a whole-script source replacement. When Draft Mode keeps the
+companion read-back on the committed source, a successful MCP edit is reported
+as `pending` and the exact intended local source is tracked until commit.
+
+This resolves the local file back to `game.ServerScriptService.MatchManager`.
+The pusher reads the exact committed Studio source through the companion,
+builds narrow atomic edits, and applies them through MCP `multi_edit`. Changed
+scripts are recorded as pending without an immediate source read-back because
+Draft Mode does not expose uncommitted source to the companion. New scripts use
+the `multi_edit` creation contract.
+
+Model pushes use the Studio companion's `SerializationService` integration. The
+asset must be inside a service mapped by `place.json`, is limited to 20 MiB,
+requires Edit mode, creates Studio undo waypoints, and replaces only the instance
+whose name matches the asset filename. Abraxius resolves the imported path after
+commit before reporting success.
 
 ## Draft Mode verification
 
-When Roblox Studio is in Draft Mode, `mcp push` writes the script source but the change may not be visible in the live DataModel until you commit the draft in Studio. Abraxius tracks these pushes and verifies them through the companion plugin.
+MCP pushes are tracked as pending after Studio accepts the edit. Abraxius does
+not immediately read the source back because Draft Mode exposes only the last
+committed source and that verification can hang. Verify after committing the
+draft, either explicitly or through the companion's source-change event.
 
 ```bash
 # Push changes
-mcp push game/src/ServerScriptService/MatchManager.server.luau
+node cli.js push game/src/ServerScriptService/MatchManager.server.luau
 
 # See pushes waiting for commit
-mcp pending
+node cli.js pending
 
 # Ask the companion plugin which pushes are live or stale
-mcp pending verify
+node cli.js pending verify
 
 # Clear the tracker after you commit drafts in Studio
-mcp pending clear
+node cli.js pending clear
 ```
 
 Statuses:
 
 | Status | Meaning |
 |---|---|
-| `pending` | Pushed but not verified yet |
+| `pending` | MCP accepted the edit and Abraxius recorded the intended source, but commit is not verified yet |
 | `live` | Studio source matches the pushed source |
-| `stale` | Studio source differs from the pushed source |
 | `error` | Plugin disconnected or command failed |
 
 ## AI context tie-in
 
-Pending pushes are included in `mcp ai-context`, so an AI agent can avoid assuming an edit is live in Studio before verification.
+Pending pushes are included in `node cli.js ai-context`, so an AI agent can
+avoid assuming an edit is live in Studio before verification.
 
 ```bash
-mcp ai-context
+node cli.js ai-context
 ```
 
 ## Programmatic sync

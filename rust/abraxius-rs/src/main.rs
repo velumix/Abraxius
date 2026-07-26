@@ -1,13 +1,16 @@
+use serde_json::{Map, Value, json};
 use std::env;
 use std::fs;
 use std::io::{Read, Write};
 use std::net::TcpStream;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
 use std::time::Duration;
 
 const API_PORT: u16 = 13470;
 const PLUGIN_FILE: &str = "AbraxiusCompanion.lua";
+const PLUGIN_VERSION: &str = "1.8.1";
+const PLUGIN_BUNDLE: &str =
+    include_str!("../../../plugin/AbraxiusCompanion/dist/AbraxiusCompanion.lua");
 
 type Result<T> = std::result::Result<T, String>;
 
@@ -43,8 +46,19 @@ fn run() -> Result<()> {
         "pending" => pending(&args),
         "plugin" => plugin(&args),
         "install-plugin" => install_plugin(),
-        "start-node" => start_node_daemon(),
-        "stop" => print_http("POST", "/shutdown", Some("{}")),
+        "plugin-version" => {
+            println!("{PLUGIN_VERSION}");
+            Ok(())
+        }
+        "start" => print_http("GET", "/health", None).map_err(|_| {
+            "Abraxius App host is offline. Launch Abraxius from Windows; this CLI does not start a daemon.".to_string()
+        }),
+        "start-node" => Err(
+            "The legacy Node daemon is disabled. Launch Abraxius; the app owns the host.".to_string(),
+        ),
+        "stop" => Err(
+            "Stop or quit Abraxius from its window or tray menu. This CLI cannot stop the app-owned host.".to_string(),
+        ),
         _ => Err(format!(
             "Unknown command: {command}\nRun `abraxius-rs help`."
         )),
@@ -57,21 +71,23 @@ fn print_usage() {
 
 Usage:
   abraxius-rs status
-  abraxius-rs start-node
+  abraxius-rs start
   abraxius-rs stop
   abraxius-rs tools
   abraxius-rs state
-  abraxius-rs call <tool> [json]
-  abraxius-rs execute <luau>
+  abraxius-rs call <tool> [json|--json-file <file>|--json-stdin]
+  abraxius-rs execute <luau|--file <file>|--stdin>
   abraxius-rs ai-context [--json] [--project <dir>]
   abraxius-rs remember <text> [--tag <tag>] [--path <path>] [--project <dir>]
   abraxius-rs memory [clear [id]] [--project <dir>]
   abraxius-rs pending [verify|clear [path]]
-  abraxius-rs plugin [status|events [limit]|selection|state|call <type> [json]]
+  abraxius-rs plugin [status|events [limit]|selection|state|call <type> [json|--json-file <file>|--json-stdin]]
   abraxius-rs install-plugin
+  abraxius-rs plugin-version
 
-This binary controls the existing Abraxius daemon API and installs the Studio
-companion plugin as a single local plugin script."#
+This binary is a thin client of the Abraxius App host and installs the Studio
+companion plugin as a single local plugin script. Host lifecycle belongs to the
+app window and tray menu."#
     );
 }
 
@@ -88,21 +104,14 @@ fn call_tool(args: &[String]) -> Result<()> {
     let name = args
         .first()
         .ok_or("Usage: abraxius-rs call <tool> [json]")?;
-    let tool_args = args.get(1).map(String::as_str).unwrap_or("{}");
-    let body = format!(
-        r#"{{"name":{},"arguments":{}}}"#,
-        json_string(name),
-        tool_args
-    );
+    let tool_args = read_json_object(&args[1..])?;
+    let body = json!({ "name": name, "arguments": tool_args }).to_string();
     print_http("POST", "/call", Some(&body))
 }
 
 fn execute(args: &[String]) -> Result<()> {
-    if args.is_empty() {
-        return Err("Usage: abraxius-rs execute <luau>".into());
-    }
-    let code = args.join(" ");
-    let body = format!(r#"{{"code":{}}}"#, json_string(&code));
+    let code = read_text_input(args)?;
+    let body = json!({ "code": code }).to_string();
     print_http("POST", "/execute", Some(&body))
 }
 
@@ -224,19 +233,47 @@ fn plugin(args: &[String]) -> Result<()> {
             "/plugin/call",
             Some(r#"{"command":{"type":"get_state"}}"#),
         ),
+        "inspect" => {
+            let path = args.get(1).ok_or("Usage: abraxius plugin inspect <path>")?;
+            let body = format!(
+                r#"{{"command":{{"type":"get_children","path":{}}}}}"#,
+                json_string(path)
+            );
+            print_http("POST", "/plugin/call", Some(&body))
+        }
+        "select" => {
+            if args.len() < 2 {
+                return Err("Usage: abraxius plugin select <path...>".into());
+            }
+            let paths = args[1..]
+                .iter()
+                .map(|path| json_string(path))
+                .collect::<Vec<_>>()
+                .join(",");
+            let body = format!(r#"{{"command":{{"type":"set_selection","paths":[{paths}]}}}}"#);
+            print_http("POST", "/plugin/call", Some(&body))
+        }
+        "open" => {
+            let path = args
+                .get(1)
+                .ok_or("Usage: abraxius plugin open <path> [line]")?;
+            let line = args
+                .get(2)
+                .and_then(|line| line.parse::<u32>().ok())
+                .unwrap_or(1);
+            let body = format!(
+                r#"{{"command":{{"type":"open_script","path":{},"line":{line}}}}}"#,
+                json_string(path)
+            );
+            print_http("POST", "/plugin/call", Some(&body))
+        }
         "call" => {
             let command_type = args
                 .get(1)
                 .ok_or("Usage: abraxius-rs plugin call <type> [json]")?;
-            let extra = args.get(2).map(String::as_str).unwrap_or("{}");
-            let extra_body = extra.trim().trim_start_matches('{').trim_end_matches('}');
-            let comma = if extra_body.is_empty() { "" } else { "," };
-            let body = format!(
-                r#"{{"command":{{"type":{}{}{}}}}}"#,
-                json_string(command_type),
-                comma,
-                extra_body
-            );
+            let mut command = read_json_object(&args[2..])?;
+            command.insert("type".to_string(), Value::String(command_type.clone()));
+            let body = json!({ "command": command }).to_string();
             print_http("POST", "/plugin/call", Some(&body))
         }
         other => Err(format!("Unknown plugin subcommand: {other}")),
@@ -244,15 +281,6 @@ fn plugin(args: &[String]) -> Result<()> {
 }
 
 fn install_plugin() -> Result<()> {
-    let repo = repo_root()?;
-    let source = repo
-        .join("plugin")
-        .join("AbraxiusCompanion")
-        .join("init.server.luau");
-    if !source.exists() {
-        return Err(format!("Plugin source not found: {}", source.display()));
-    }
-
     let dest_dir = roblox_plugins_dir()?;
     fs::create_dir_all(&dest_dir).map_err(|err| err.to_string())?;
 
@@ -263,31 +291,12 @@ fn install_plugin() -> Result<()> {
     }
 
     let dest = dest_dir.join(PLUGIN_FILE);
-    fs::copy(&source, &dest).map_err(|err| err.to_string())?;
+    fs::write(&dest, PLUGIN_BUNDLE).map_err(|err| err.to_string())?;
     println!(
         "Installed AbraxiusCompanion plugin to:\n  {}",
         dest.display()
     );
     println!("Restart Roblox Studio to load it.");
-    Ok(())
-}
-
-fn start_node_daemon() -> Result<()> {
-    let repo = repo_root()?;
-    let server = repo.join("server.js");
-    if !server.exists() {
-        return Err(format!("server.js not found at {}", server.display()));
-    }
-    Command::new("node")
-        .arg(server)
-        .arg("--daemon")
-        .current_dir(repo)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .map_err(|err| format!("failed to spawn node daemon: {err}"))?;
-    println!("Started Abraxius Node daemon.");
     Ok(())
 }
 
@@ -338,6 +347,137 @@ struct Options {
     path: Option<String>,
     project_dir: Option<String>,
     json: bool,
+}
+
+fn read_json_object(args: &[String]) -> Result<Map<String, Value>> {
+    let mut file: Option<&str> = None;
+    let mut stdin = false;
+    let mut inline: Option<&str> = None;
+    let mut positionals = Vec::new();
+    let mut literal = false;
+    let mut index = 0;
+
+    while index < args.len() {
+        let argument = args[index].as_str();
+        if literal {
+            positionals.push(argument);
+        } else {
+            match argument {
+                "--" => literal = true,
+                "--json-file" => {
+                    index += 1;
+                    file = Some(args.get(index).ok_or("Missing path after --json-file")?);
+                }
+                "--json-stdin" => stdin = true,
+                "--json" => {
+                    index += 1;
+                    inline = Some(args.get(index).ok_or("Missing value after --json")?);
+                }
+                value => positionals.push(value),
+            }
+        }
+        index += 1;
+    }
+
+    let selected = usize::from(file.is_some()) + usize::from(stdin) + usize::from(inline.is_some());
+    if selected > 1 {
+        return Err("Choose only one --json-file, --json-stdin, or --json input source.".into());
+    }
+
+    let (raw, source) = if let Some(path) = file {
+        (
+            fs::read_to_string(path)
+                .map_err(|err| format!("Could not read JSON file {path}: {err}"))?,
+            path.to_string(),
+        )
+    } else if stdin {
+        let mut raw = String::new();
+        std::io::stdin()
+            .read_to_string(&mut raw)
+            .map_err(|err| format!("Could not read JSON from standard input: {err}"))?;
+        (raw, "standard input".to_string())
+    } else if let Some(value) = inline {
+        (value.to_string(), "--json".to_string())
+    } else {
+        if positionals.len() > 1 {
+            return Err(format!(
+                "Unexpected arguments after JSON input: {}. Use --json-file or --json-stdin when PowerShell may split the payload.",
+                positionals[1..].join(" ")
+            ));
+        }
+        (
+            positionals.first().copied().unwrap_or("{}").to_string(),
+            "command line".to_string(),
+        )
+    };
+
+    let raw = raw.strip_prefix('\u{feff}').unwrap_or(&raw);
+    let value: Value = serde_json::from_str(raw).map_err(|err| {
+        format!(
+            "Invalid JSON from {source}: {err}. PowerShell users should prefer --json-file or --json-stdin."
+        )
+    })?;
+    match value {
+        Value::Object(object) => Ok(object),
+        _ => Err("JSON command arguments must be an object at the top level.".into()),
+    }
+}
+
+fn read_text_input(args: &[String]) -> Result<String> {
+    let mut file: Option<&str> = None;
+    let mut stdin = false;
+    let mut inline: Option<&str> = None;
+    let mut positionals = Vec::new();
+    let mut literal = false;
+    let mut index = 0;
+
+    while index < args.len() {
+        let argument = args[index].as_str();
+        if literal {
+            positionals.push(argument);
+        } else {
+            match argument {
+                "--" => literal = true,
+                "--file" | "--text-file" => {
+                    index += 1;
+                    file = Some(args.get(index).ok_or("Missing path after --file")?);
+                }
+                "--stdin" | "--text-stdin" => stdin = true,
+                "--text" => {
+                    index += 1;
+                    inline = Some(args.get(index).ok_or("Missing value after --text")?);
+                }
+                value => positionals.push(value),
+            }
+        }
+        index += 1;
+    }
+
+    let selected = usize::from(file.is_some()) + usize::from(stdin) + usize::from(inline.is_some());
+    if selected > 1 {
+        return Err("Choose only one --file, --stdin, or --text input source.".into());
+    }
+
+    let value = if let Some(path) = file {
+        fs::read_to_string(path).map_err(|err| format!("Could not read text file {path}: {err}"))?
+    } else if stdin {
+        let mut value = String::new();
+        std::io::stdin()
+            .read_to_string(&mut value)
+            .map_err(|err| format!("Could not read text from standard input: {err}"))?;
+        value
+    } else if let Some(value) = inline {
+        value.to_string()
+    } else {
+        positionals.join(" ")
+    };
+
+    let value = value.strip_prefix('\u{feff}').unwrap_or(&value).to_string();
+    if value.is_empty() {
+        Err("Input is empty. Pass text inline, with --file, or through --stdin.".into())
+    } else {
+        Ok(value)
+    }
 }
 
 fn parse_options(args: &[String]) -> Options {
@@ -409,15 +549,6 @@ fn url_encode(value: &str) -> String {
         }
     }
     out
-}
-
-fn repo_root() -> Result<PathBuf> {
-    let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    manifest_dir
-        .parent()
-        .and_then(Path::parent)
-        .map(Path::to_path_buf)
-        .ok_or_else(|| "could not resolve repo root".to_string())
 }
 
 fn roblox_plugins_dir() -> Result<PathBuf> {

@@ -1,0 +1,52 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <style>
+    html, body, #editor { width: 100%; height: 100%; margin: 0; overflow: hidden; background: transparent; }
+  </style>
+</head>
+<body>
+  <div id="editor"></div>
+  <script src="vs/loader.js"></script>
+  <script>
+    require.config({ paths: { vs: './vs' } });
+    require(['vs/editor/editor.main'], function () {
+      monaco.languages.register({ id: 'luau' });
+      monaco.languages.setMonarchTokensProvider('luau', {
+        keywords: ['and','break','continue','do','else','elseif','end','export','false','for','function','if','in','local','nil','not','or','repeat','return','then','true','type','until','while'],
+        tokenizer: { root: [
+          [/--\[\[[\s\S]*?\]\]/, 'comment'], [/--.*$/, 'comment'],
+          [/"([^"\\]|\\.)*$/, 'string.invalid'], [/"([^"\\]|\\.)*"/, 'string'], [/'([^'\\]|\\.)*'/, 'string'],
+          [/\b\d+(\.\d+)?\b/, 'number'], [/[a-zA-Z_][\w]*/, { cases: { '@keywords': 'keyword', '@default': 'identifier' } }]
+        ] }
+      });
+      monaco.languages.setLanguageConfiguration('luau', {
+        comments: { lineComment: '--', blockComment: ['--[[', ']]'] },
+        brackets: [['{','}'], ['[',']'], ['(',')']],
+        autoClosingPairs: [{open:'{',close:'}'},{open:'[',close:']'},{open:'(',close:')'},{open:'"',close:'"'},{open:"'",close:"'"}]
+      });
+      window.abraxiusEditor = monaco.editor.create(document.getElementById('editor'), {
+        value: '-- Pull a script from Studio to begin.\n', language: 'luau', theme: 'vs-dark', automaticLayout: true,
+        minimap: { enabled: true }, fontSize: 14, fontFamily: 'Cascadia Code, Consolas, monospace',
+        scrollBeyondLastLine: false, smoothScrolling: true, padding: { top: 12, bottom: 12 }
+      });
+      window.abraxiusSuppressChange = false;
+      window.abraxiusEditor.onDidChangeModelContent(function () {
+        if (window.abraxiusSuppressChange) return;
+        window.chrome.webview.postMessage(JSON.stringify({ type: 'dirty', dirty: true }));
+      });
+      window.chrome.webview.postMessage(JSON.stringify({ type: 'ready' }));
+    });
+    window.abraxius = {
+      setValue: function (value) { window.abraxiusSuppressChange = true; window.abraxiusEditor.setValue(value || ''); window.abraxiusSuppressChange = false; },
+      getValue: function () { return window.abraxiusEditor.getValue(); },
+      setTheme: function () { monaco.editor.setTheme('vs-dark'); },
+      action: function (id) { var action = window.abraxiusEditor.getAction(id); if (action) action.run(); },
+      formatBasic: function () { var value = window.abraxiusEditor.getValue().split('\n').map(function(line){ return line.replace(/[ \t]+$/g, ''); }).join('\n'); window.abraxiusEditor.setValue(value); },
+      focus: function () { window.abraxiusEditor.focus(); }
+    };
+  </script>
+</body>
+</html>

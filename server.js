@@ -425,6 +425,17 @@ async function createServer(bridge) {
           sendJson(res, 200, { pushes: pendingPushes.list() });
           break;
 
+        case "POST /pending/record": {
+          const body = await readBody(req);
+          if (!body.path || typeof body.source !== "string") {
+            sendJson(res, 400, { error: "Missing path or source" });
+            break;
+          }
+          const push = pendingPushes.recordPush(body.path, body.source);
+          sendJson(res, 200, { ok: true, push });
+          break;
+        }
+
         case "POST /pending/verify": {
           const pushes = pendingPushes.list().filter((p) => p.status !== "committed");
           const verified = [];
@@ -533,9 +544,13 @@ async function runDaemon() {
   );
   bridge.on("error", (err) => logger.error(`bridge error: ${err.message}`));
 
-  await bridge.start();
-  await createServer(bridge);
-  await pluginServer.start();
+  // All local endpoints must remain available while Studio connects or
+  // reconnects. Studio readiness is connection state, not daemon readiness.
+  await Promise.all([
+    bridge.start(),
+    createServer(bridge),
+    pluginServer.start(),
+  ]);
 
   pluginServer.on("connect", async () => {
     try {
@@ -548,6 +563,7 @@ async function runDaemon() {
   });
 
   pluginServer.on("event", async (ev) => {
+    context.ingestStudioEvent(ev);
     if (ev && ev.type === "source_changed" && pendingPushes.get(ev.path)) {
       try {
         const result = await pluginServer.callPlugin({ type: "read_source", path: ev.path });

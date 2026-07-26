@@ -6,7 +6,7 @@ const http = require("http");
 class RobloxMCPBridge extends EventEmitter {
   constructor(options = {}) {
     super();
-    this.port = options.port || 13469;
+    this.port = options.port ?? 13469;
     this.path = options.path || "/studio";
     this.clientInfo = options.clientInfo || {
       name: "roblox-mcp-bridge",
@@ -35,7 +35,7 @@ class RobloxMCPBridge extends EventEmitter {
     this._shutdown = false;
   }
 
-  async start(timeoutMs = 30000) {
+  async start() {
     if (this.server) throw new Error("Bridge already started");
 
     await new Promise((resolve, reject) => {
@@ -58,33 +58,13 @@ class RobloxMCPBridge extends EventEmitter {
 
       this.server.on("error", reject);
       this.server.listen(this.port, () => {
+        this.port = this.server.address().port;
         this.emit("listening", { port: this.port, path: this.path });
         resolve();
       });
     });
 
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        reject(
-          new Error(
-            `Roblox Studio did not connect within ${timeoutMs}ms. Make sure Studio is open and MCP is enabled.`,
-          ),
-        );
-      }, timeoutMs);
-
-      const onReady = () => {
-        clearTimeout(timer);
-        this.off("error", onError);
-        resolve(this.serverInfo);
-      };
-      const onError = (err) => {
-        clearTimeout(timer);
-        this.off("ready", onReady);
-        reject(err);
-      };
-      this.once("ready", onReady);
-      this.once("error", onError);
-    });
+    return { port: this.port, path: this.path };
   }
 
   stop() {
@@ -119,6 +99,7 @@ class RobloxMCPBridge extends EventEmitter {
     ws.on("message", (data) => this._onMessage(data));
     ws.on("pong", () => this._handlePong());
     ws.on("close", (code, reason) => {
+      if (this.ws !== ws) return;
       this.ready = false;
       this.ws = null;
       this.serverInfo = null;
@@ -242,7 +223,8 @@ class RobloxMCPBridge extends EventEmitter {
         this.ws.ping();
         this._heartbeatTimeout = setTimeout(() => {
           this.emit("error", new Error("Heartbeat timeout; reconnecting"));
-          this.ws.terminate();
+          const socket = this.ws;
+          if (socket && socket.readyState !== WebSocket.CLOSED) socket.terminate();
         }, this.heartbeatTimeoutMs);
       } catch {
         this._clearHeartbeat();
@@ -319,6 +301,25 @@ class RobloxMCPBridge extends EventEmitter {
     } catch {
       // Silent fail - Studio output is optional.
     }
+  }
+
+  waitForReady(timeoutMs = 30000) {
+    if (this.ready) return Promise.resolve(this.serverInfo);
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error(`Roblox Studio did not connect within ${timeoutMs}ms.`));
+      }, timeoutMs);
+      const onReady = (info) => {
+        cleanup();
+        resolve(info);
+      };
+      const cleanup = () => {
+        clearTimeout(timer);
+        this.off("ready", onReady);
+      };
+      this.on("ready", onReady);
+    });
   }
 
   async listPrompts() {

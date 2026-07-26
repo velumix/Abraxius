@@ -6,3 +6,7 @@ target/
 .moonwave/Cache/
 .moonwave/*.log
 .kimi/
+.codex/
+app/**/bin/
+app/**/obj/
+app/**/AppPackages/

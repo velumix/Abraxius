@@ -1,9 +1,10 @@
 {
   "name": "abraxius",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "AI-ready MCP bridge, Studio companion plugin, and script sync for Roblox Studio",
   "main": "client.js",
   "bin": {
+    "abraxius": "./cli.js",
     "mcp": "./cli.js"
   },
   "scripts": {
@@ -14,10 +15,14 @@
     "docs:dev": "moonwave dev --code .moonwave/stub",
     "docs:build": "moonwave build --fresh --code .moonwave/stub",
     "smoke": "node scripts/smoke.js",
+    "test": "node --test test/*.test.js",
+    "plugin:build": "node scripts/build-plugin.js",
     "rust:check": "cargo check --manifest-path rust/abraxius-rs/Cargo.toml",
-    "rust:build": "cargo build --manifest-path rust/abraxius-rs/Cargo.toml",
-    "rust:run": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-rs --",
+    "rust:build": "cargo build --release --manifest-path rust/abraxius-rs/Cargo.toml",
+    "rust:run": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius --",
     "rust:daemon": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-daemon",
+    "app:build": "npm run rust:build && dotnet build app/Abraxius.App/Abraxius.App.csproj -c Release -p:Platform=x64",
+    "app:run": "dotnet run --project app/Abraxius.App/Abraxius.App.csproj -c Release -p:Platform=x64",
     "install-plugin": "node scripts/install-plugin.js",
     "plugin": "node scripts/install-plugin.js"
   },
@@ -32,12 +37,13 @@
     "ai-context",
     "roblox-studio"
   ],
-  "author": "",
+  "author": "Velumix",
   "license": "MIT",
   "dependencies": {
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "monaco-editor": "^0.55.1",
     "moonwave": "^1.4.2"
   }
 }

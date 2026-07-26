@@ -1,117 +1,131 @@
 # CLI Reference
 
-The `mcp` command is the main interface for managing the bridge and interacting with Roblox Studio.
+AI agents should choose a workflow with [AI Guide: Using
+Abraxius](ai-usage.md) before using this complete syntax reference.
 
-## Daemon commands
+Run the Node CLI as `node cli.js <command>`, or install it globally and use
+`abraxius <command>`. The earlier `mcp` executable remains as a compatibility
+alias. The Rust control binary is available through
+`npm run rust:run -- <command>`.
 
-| Command | Description |
-|---|---|
-| `start` | Start the bridge daemon in the background |
-| `stop` | Stop the background bridge |
-| `status` | Check daemon + Studio connection |
-| `logs` | Tail daemon log file |
-
-## Query commands
+## App host
 
 | Command | Description |
 |---|---|
-| `tools` | List available MCP tools |
-| `state` | Get current studio state |
-| `call <name> [json]` | Call a tool with JSON arguments |
-| `smart <name> [json]` | Context-aware tool call (auto datamodel, records history) |
-| `execute <code>` | Execute Luau code in Studio |
-| `repl` | Interactive tool-calling shell |
-| `context` | Show or set session context |
-| `ai-context [--json] [--project <dir>]` | Print one AI-readable briefing |
-| `remember <text> [--tag <tag>] [--path <path>]` | Pin a durable project fact |
-| `memory` | List pinned project memory |
-| `memory clear [id]` | Clear all pinned memory, or one entry |
-| `npm run rust:run -- <command>` | Run the Rust control binary |
+| `start` | Confirm the Abraxius App host is running; otherwise instruct the user to launch it |
+| `stop` | Direct lifecycle control back to the app |
+| `status` | Read app-host, MCP, and companion health |
+| `logs` | Tail the app-supervised host log |
 
-## Edit commands
+The CLI is always a thin client of Abraxius.App. It never starts the legacy
+Node daemon, takes ownership of ports `13469`-`13471`, or shuts down the Rust
+host. Start, restart, stop, and quit belong to the app window or tray menu.
+
+## AXL
 
 | Command | Description |
 |---|---|
-| `edit <path> <old> <new>` | Read + edit a script in one step |
-| `batch <file>` | Run a JSON batch file of tool calls |
-| `find-replace <paths-file> <old> <new>` | Find/replace across multiple Studio scripts |
-| `search [keywords]` | Smart script search |
+| `axl <text>` | Parse and execute one compact AXL/1 command |
+| `axl --file <file>` | Execute exact UTF-8 AXL from a file |
+| `axl --stdin` | Read exact AXL from standard input |
+| `axl --ast <text>` | Parse and print the typed JSON AST without execution |
 
-## Sync commands
+See [AXL — Abraxius Exchange Language](axl.md) for the grammar, revision-safe
+patch form, compact responses, and currently reserved features.
 
-| Command | Description |
-|---|---|
-| `pull [dir]` | Pull all scripts into a local project (default: current directory) |
-| `pull --target <path> [dir]` | Pull one Studio script by path |
-| `pull --targets-file <file> [dir]` | Pull a list of Studio paths from a file |
-| `push <file>` | Push a local script file back to Studio |
-
-## Draft Mode / companion plugin commands
+## Companion
 
 | Command | Description |
 |---|---|
-| `plugin` | Show Studio companion plugin connection status |
-| `plugin events [limit]` | Show recent companion plugin events |
-| `plugin selection` | Show current Explorer selection |
-| `plugin state` | Show plugin-observed Studio state |
-| `plugin call <type> [json]` | Send a raw command to the companion plugin |
-| `pending` | List pushes that are waiting for Studio to commit |
-| `pending verify` | Ask the companion plugin which pushes are still stale |
-| `pending clear [path]` | Clear pending push record(s) |
+| `plugin` | Show companion session status |
+| `plugin events [limit]` | Show recent Studio events |
+| `plugin selection` | Read the Explorer selection |
+| `plugin state` | Read edit/play mode state |
+| `plugin inspect <path>` | List direct children of an instance |
+| `plugin select <paths...>` | Select Studio instances |
+| `plugin open <path> [line]` | Open a Studio script |
+| `plugin call <type> [json]` | Send a raw companion command; supports JSON files/stdin |
 
-## Examples
+## Sync
 
-```bash
-# Start the daemon
-mcp start
+| Command | Description |
+|---|---|
+| `pull [dir]` | Export all scripts through the companion |
+| `pull --target <path> [dir]` | Pull one script; requires MCP |
+| `pull --targets-file <file> [dir]` | Pull listed targets; requires MCP |
+| `push <file>` | Push a mapped script through granular MCP `multi_edit` |
 
-# List tools
-mcp tools
-
-# Get studio state
-mcp state
-
-# Call a tool
-mcp call search_game_tree '{"path":"Workspace","max_depth":2,"head_limit":20}'
-mcp call script_read '{"target_file":"ServerScriptService.MatchManager","should_read_entire_file":true}'
-
-# Context-aware call
-mcp smart execute_luau '{"code":"return game.Workspace"}'
-
-# Pin durable AI memory and produce a context briefing
-mcp remember "MatchManager owns round flow." --tag architecture --path ServerScriptService.MatchManager
-mcp memory
-mcp ai-context
-
-# Use the Rust extension control binary
-npm run rust:check
-npm run rust:run -- ai-context
-
-# Execute Luau
-mcp execute 'print(#game.Workspace:GetChildren())'
-
-# Pull all scripts into a project
-mcp pull ./my-game
-
-# Pull one specific script
-mcp pull --target ServerScriptService.MatchManager ./my-game
-
-# Pull a list of targets from a file
-mcp pull --targets-file targets.txt ./my-game
-
-# Push an edited script back
-mcp push ./my-game/src/ServerScriptService/MatchManager.server.luau
-
-# Install the Studio companion plugin
-npm run install-plugin
-
-# See pushes waiting for commit
-mcp pending
-mcp pending verify
-
-# Inspect Studio companion plugin state
-mcp plugin
-mcp plugin events 20
-mcp plugin selection
-mcp plugin call resolve_path '{"path":"ServerScriptService.MatchManager"}'
+```powershell
+node cli.js pull game
+node cli.js push game\src\ServerScriptService\KnitServer.server.luau
+node cli.js plugin call read_source '{"path":"game.ServerScriptService.KnitServer"}'
 ```
+
+## PowerShell-safe input
+
+Complex JSON and multiline Luau should not be placed directly on a PowerShell
+command line. Abraxius reads UTF-8 input from files or standard input before it
+parses JSON, so quotes, backslashes, newlines, dollar signs, backticks, and
+Unicode reach Studio without a shell escaping round trip.
+
+```powershell
+# Safest for generated commands and source-bearing payloads
+node cli.js plugin call write_source --json-file .\write-source.json
+
+# A PowerShell here-string can be piped without inline argument quoting
+@'
+{"path":"game.ServerScriptService.Test","dryRun":true,"source":"print(\"hello\")"}
+'@ | node cli.js plugin call write_source --json-stdin
+
+# Multiline Luau stays as exact file content
+node cli.js execute --file .\diagnostic.luau
+$OutputEncoding = [System.Text.UTF8Encoding]::new($false)
+Get-Content -Encoding UTF8 -Raw .\diagnostic.luau | node cli.js execute --stdin
+```
+
+The same `--json-file`, `--json-stdin`, and explicit `--json` inputs work with
+`call`, `smart`, and `plugin call` in both the Node and Rust control CLIs.
+`execute` accepts `--file`, `--stdin`, and explicit `--text`. JSON command
+payloads must be objects, and the `plugin call <type>` positional type cannot be
+overridden by a `type` field inside the JSON payload.
+
+For byte-exact Unicode on Windows PowerShell 5.1, prefer `--json-file` or
+`--file`. If stdin is required, set `$OutputEncoding` to a BOM-less
+`UTF8Encoding` and use `Get-Content -Encoding UTF8 -Raw`; both halves are
+required because PowerShell otherwise decodes or emits the text with a legacy
+code page.
+
+Full pull writes `place.json` and `src/`. Script push requires MCP plus the
+companion: the companion supplies byte-exact reads, while every source mutation
+uses atomic `multi_edit` operations. Whole-script fallback writes are disabled.
+If Draft Mode delays companion read-back until commit, the push succeeds as a
+tracked pending edit. The push does not immediately read the source back.
+Treat `pending: true` as accepted, do not retry, and use `pending verify` only
+after the draft is committed.
+
+## MCP-dependent commands
+
+| Command | Description |
+|---|---|
+| `tools` | List connected MCP tools |
+| `state` | Read MCP Studio state |
+| `call <name> [json]` | Call an MCP tool; supports `--json-file`/`--json-stdin` |
+| `smart <name> [json]` | Context-aware call; supports file/stdin JSON |
+| `execute <code>` | Execute Luau; supports `--file`/`--stdin` |
+| `edit`, `batch`, `find-replace`, `search` | High-level MCP edit helpers |
+
+These commands return a connection error when the legacy MCP bridge is not
+connected. Companion commands and full sync remain available independently.
+
+## Context and memory
+
+| Command | Description |
+|---|---|
+| `context` | Show or set session context |
+| `ai-context [--json] [--project <dir>]` | Print an AI briefing |
+| `remember <text> [options]` | Pin durable project memory |
+| `memory` | List pinned memory |
+| `memory clear [id]` | Clear one or all entries |
+| `pending` | List tracked pushes |
+| `pending verify` | Verify tracked Studio sources |
+| `pending clear [path]` | Clear tracked push records |
