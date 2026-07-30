@@ -7,7 +7,7 @@
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
   IgnorableNamespaces="uap uap5 rescap">
 
-  <Identity Name="Velumix.Abraxius" Publisher="CN=Velumix" Version="1.14.5.0" />
+  <Identity Name="Velumix.Abraxius" Publisher="CN=Velumix" Version="1.15.1.0" />
   <mp:PhoneIdentity PhoneProductId="8ec610bc-01e5-49f7-aa4e-a12cedf59c37" PhonePublisherId="00000000-0000-0000-0000-000000000000" />
 
   <Properties>

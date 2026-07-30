@@ -19,7 +19,7 @@ local Logger = require(script.Logger)
 
 local PLUGIN_URL = "http://localhost:13471"
 local ANALYTICS_URL = "http://localhost:13472"
-local PLUGIN_VERSION = "1.8.1"
+local PLUGIN_VERSION = "1.8.5"
 local POLL_INTERVAL = 0.5
 local EVENT_LIMIT = 64
 local CONTEXT_SNAPSHOT_INTERVAL = 10

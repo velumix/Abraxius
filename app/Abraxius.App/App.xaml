@@ -6,22 +6,87 @@
         <ResourceDictionary>
             <ResourceDictionary.ThemeDictionaries>
                 <ResourceDictionary x:Key="Default">
-                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#6C4DFF" />
-                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="#176C4DFF" />
-                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#C8FFFFFF" />
-                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="#E8FFFFFF" />
-                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="#24000000" />
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#5B4BFF" />
+                    <SolidColorBrush x:Key="BrandSecondaryBrush" Color="#007F9D" />
+                    <SolidColorBrush x:Key="BrandWarmBrush" Color="#B23A64" />
+                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="#1F5B4BFF" />
+                    <SolidColorBrush x:Key="BrandSecondarySoftBrush" Color="#1900A4C7" />
+                    <SolidColorBrush x:Key="BrandWarmSoftBrush" Color="#18D14D78" />
+                    <SolidColorBrush x:Key="AppCanvasBrush" Color="#D8F3F5FA" />
+                    <SolidColorBrush x:Key="NavigationSurfaceBrush" Color="#E8F8F9FC" />
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#EFFFFFFF" />
+                    <SolidColorBrush x:Key="CardSurfaceStrongBrush" Color="#FAFFFFFF" />
+                    <SolidColorBrush x:Key="CardStrokeBrush" Color="#180C1433" />
+                    <LinearGradientBrush x:Key="HeroGradientBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#245B4BFF" Offset="0" />
+                        <GradientStop Color="#1500A4C7" Offset="0.58" />
+                        <GradientStop Color="#0CD14D78" Offset="1" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="ServerCardBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#1C20A464" Offset="0" />
+                        <GradientStop Color="#EFFFFFFF" Offset="0.72" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="StudioCardBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#205B4BFF" Offset="0" />
+                        <GradientStop Color="#EFFFFFFF" Offset="0.72" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="SyncCardBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#1C00A4C7" Offset="0" />
+                        <GradientStop Color="#EFFFFFFF" Offset="0.72" />
+                    </LinearGradientBrush>
+                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#EFFFFFFF" />
+                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="#FAFFFFFF" />
+                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="#180C1433" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="Dark">
-                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#9C86FF" />
-                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="#269C86FF" />
-                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#98212121" />
-                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="#C02A2A2A" />
-                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="#28FFFFFF" />
+                    <SolidColorBrush x:Key="BrandAccentBrush" Color="#A99BFF" />
+                    <SolidColorBrush x:Key="BrandSecondaryBrush" Color="#52D6EF" />
+                    <SolidColorBrush x:Key="BrandWarmBrush" Color="#FF86A7" />
+                    <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="#335B4BFF" />
+                    <SolidColorBrush x:Key="BrandSecondarySoftBrush" Color="#2852D6EF" />
+                    <SolidColorBrush x:Key="BrandWarmSoftBrush" Color="#26FF86A7" />
+                    <SolidColorBrush x:Key="AppCanvasBrush" Color="#C80A0D18" />
+                    <SolidColorBrush x:Key="NavigationSurfaceBrush" Color="#E20E1221" />
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="#D8151928" />
+                    <SolidColorBrush x:Key="CardSurfaceStrongBrush" Color="#F01B2032" />
+                    <SolidColorBrush x:Key="CardStrokeBrush" Color="#28C7D2FF" />
+                    <LinearGradientBrush x:Key="HeroGradientBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#465B4BFF" Offset="0" />
+                        <GradientStop Color="#2600A4C7" Offset="0.58" />
+                        <GradientStop Color="#18D14D78" Offset="1" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="ServerCardBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#3220A464" Offset="0" />
+                        <GradientStop Color="#D8151928" Offset="0.72" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="StudioCardBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#385B4BFF" Offset="0" />
+                        <GradientStop Color="#D8151928" Offset="0.72" />
+                    </LinearGradientBrush>
+                    <LinearGradientBrush x:Key="SyncCardBrush" StartPoint="0,0" EndPoint="1,1">
+                        <GradientStop Color="#3052D6EF" Offset="0" />
+                        <GradientStop Color="#D8151928" Offset="0.72" />
+                    </LinearGradientBrush>
+                    <SolidColorBrush x:Key="GlassSurfaceBrush" Color="#D8151928" />
+                    <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="#F01B2032" />
+                    <SolidColorBrush x:Key="GlassStrokeBrush" Color="#28C7D2FF" />
                 </ResourceDictionary>
                 <ResourceDictionary x:Key="HighContrast">
                     <SolidColorBrush x:Key="BrandAccentBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="BrandSecondaryBrush" Color="{ThemeResource SystemColorHighlightColor}" />
+                    <SolidColorBrush x:Key="BrandWarmBrush" Color="{ThemeResource SystemColorHighlightColor}" />
                     <SolidColorBrush x:Key="BrandAccentSoftBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="BrandSecondarySoftBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="BrandWarmSoftBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="AppCanvasBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="NavigationSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="CardSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="CardSurfaceStrongBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="CardStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
+                    <SolidColorBrush x:Key="HeroGradientBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="ServerCardBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="StudioCardBrush" Color="{ThemeResource SystemColorWindowColor}" />
+                    <SolidColorBrush x:Key="SyncCardBrush" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="GlassSurfaceBrush" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="GlassSurfaceStrongBrush" Color="{ThemeResource SystemColorWindowColor}" />
                     <SolidColorBrush x:Key="GlassStrokeBrush" Color="{ThemeResource SystemColorWindowTextColor}" />
@@ -31,15 +96,46 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
             </ResourceDictionary.MergedDictionaries>
             <Style x:Key="PageTitleStyle" TargetType="TextBlock" BasedOn="{StaticResource TitleTextBlockStyle}">
-                <Setter Property="FontSize" Value="28" />
+                <Setter Property="FontSize" Value="30" />
                 <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="CharacterSpacing" Value="-18" />
+                <Setter Property="Foreground" Value="{ThemeResource BrandAccentBrush}" />
             </Style>
             <Style x:Key="SectionCardStyle" TargetType="Border">
                 <Setter Property="Padding" Value="18" />
-                <Setter Property="CornerRadius" Value="12" />
-                <Setter Property="Background" Value="{ThemeResource GlassSurfaceBrush}" />
-                <Setter Property="BorderBrush" Value="{ThemeResource GlassStrokeBrush}" />
+                <Setter Property="CornerRadius" Value="16" />
+                <Setter Property="Background" Value="{ThemeResource CardSurfaceBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeBrush}" />
                 <Setter Property="BorderThickness" Value="1" />
+            </Style>
+            <Style x:Key="HeroCardStyle" TargetType="Border">
+                <Setter Property="Padding" Value="22" />
+                <Setter Property="CornerRadius" Value="20" />
+                <Setter Property="Background" Value="{ThemeResource HeroGradientBrush}" />
+                <Setter Property="BorderBrush" Value="{ThemeResource BrandAccentSoftBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+            <Style x:Key="StatusCardStyle" TargetType="Border">
+                <Setter Property="Padding" Value="17" />
+                <Setter Property="CornerRadius" Value="15" />
+                <Setter Property="BorderBrush" Value="{ThemeResource CardStrokeBrush}" />
+                <Setter Property="BorderThickness" Value="1" />
+            </Style>
+            <Style x:Key="IconTileStyle" TargetType="Border">
+                <Setter Property="Width" Value="42" />
+                <Setter Property="Height" Value="42" />
+                <Setter Property="CornerRadius" Value="12" />
+                <Setter Property="Background" Value="{ThemeResource BrandAccentSoftBrush}" />
+            </Style>
+            <Style x:Key="EyebrowTextStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
+                <Setter Property="FontWeight" Value="SemiBold" />
+                <Setter Property="CharacterSpacing" Value="90" />
+                <Setter Property="Foreground" Value="{ThemeResource BrandAccentBrush}" />
+            </Style>
+            <Style x:Key="BrandPrimaryButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+                <Setter Property="Background" Value="{ThemeResource BrandAccentBrush}" />
+                <Setter Property="CornerRadius" Value="8" />
+                <Setter Property="Padding" Value="16,8" />
             </Style>
         </ResourceDictionary>
     </Application.Resources>

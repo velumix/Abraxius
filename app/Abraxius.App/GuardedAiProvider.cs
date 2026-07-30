@@ -1,5 +1,6 @@
 using System.Runtime.CompilerServices;
 using System.Text;
+using System.Text.Json;
 
 namespace Abraxius.App;
 
@@ -8,6 +9,9 @@ internal sealed class GuardedAiProvider(IAiProvider inner) : IAiProvider, IDispo
     public string Name => inner.Name;
 
     public Task<IReadOnlyList<AiModel>> ListModelsAsync(CancellationToken cancellationToken = default) => inner.ListModelsAsync(cancellationToken);
+
+    public Task<string> CompleteStructuredAsync(string model, IReadOnlyList<AiMessage> messages, JsonElement schema, CancellationToken cancellationToken = default)
+        => inner.CompleteStructuredAsync(model, messages, schema, cancellationToken);
 
     public async IAsyncEnumerable<string> StreamChatAsync(string model, IReadOnlyList<AiMessage> messages, [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {

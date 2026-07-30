@@ -62,6 +62,145 @@ local function bounded(text: string, budget: number): string
 	return string.sub(text, 1, math.max(0, maximum - 16)) .. "\n...TRUNCATED"
 end
 
+local STOP_WORDS: { [string]: boolean } = {
+	about = true, after = true, again = true, also = true, ["and"] = true,
+	are = true, can = true, code = true, could = true, from = true,
+	have = true, into = true, just = true, need = true, roblox = true,
+	script = true, should = true, studio = true, that = true, the = true,
+	their = true, ["then"] = true, this = true, want = true, what = true,
+	when = true, where = true, with = true, would = true,
+}
+
+local function normalizeTerm(raw: string): string
+	if #raw > 4 and string.sub(raw, -1) == "s" and string.sub(raw, -2) ~= "ss" then
+		return string.sub(raw, 1, -2)
+	end
+	return raw
+end
+
+local function taskTerms(taskText: string): { string }
+	local terms = {}
+	local seen: { [string]: boolean } = {}
+	for raw in string.gmatch(string.lower(taskText), "[%w_]+") do
+		local term = normalizeTerm(raw)
+		if #term >= 3 and not STOP_WORDS[raw] and not seen[term] then
+			seen[term] = true
+			table.insert(terms, term)
+			if #terms >= 12 then break end
+		end
+	end
+	return terms
+end
+
+local function termCounts(text: string, wanted: { [string]: boolean }): { [string]: number }
+	local counts: { [string]: number } = {}
+	local separated = string.gsub(text, "(%l)(%u)", "%1 %2")
+	separated = string.gsub(separated, "_", " ")
+	for raw in string.gmatch(string.lower(separated), "[%w]+") do
+		local term = normalizeTerm(raw)
+		if wanted[term] and (counts[term] or 0) < 4 then
+			counts[term] = (counts[term] or 0) + 1
+		end
+	end
+	return counts
+end
+
+local function isVendoredPath(lowerPath: string): boolean
+	return string.find(lowerPath, ".dependencies.", 1, true) ~= nil
+		or string.find(lowerPath, ".packages.", 1, true) ~= nil
+		or string.find(lowerPath, "._index.", 1, true) ~= nil
+		or string.find(lowerPath, "._reactpackages.", 1, true) ~= nil
+		or string.find(lowerPath, ".node_modules.", 1, true) ~= nil
+end
+
+local function relevantScripts(taskText: string, budget: number): string
+	local terms = taskTerms(taskText)
+	if #terms == 0 then return "No distinctive task terms were available." end
+	local wanted: { [string]: boolean } = {}
+	for _, term in ipairs(terms) do wanted[term] = true end
+	local minimumScore = if #terms >= 3 then 20 else 1
+
+	local ranked = {}
+	for _, descendant in ipairs(game:GetDescendants()) do
+		if descendant:IsA("LuaSourceContainer") then
+			local path = string.gsub(descendant:GetFullName(), "^game%.", "")
+			local lowerPath = string.lower(path)
+			local source = descendant.Source
+			local pathCounts = termCounts(path, wanted)
+			local sourceCounts = termCounts(source, wanted)
+			local score = 0
+			local matchedTerms = {}
+			local pathCoverage = 0
+			for _, term in ipairs(terms) do
+				local matched = false
+				if pathCounts[term] then
+					score += 18
+					pathCoverage += 1
+					matched = true
+				end
+				if sourceCounts[term] then
+					score += sourceCounts[term]
+					matched = true
+				end
+				if matched then table.insert(matchedTerms, term) end
+			end
+			local coverage = #matchedTerms
+			if coverage > 0 then
+				score += coverage * 20
+				if coverage == 1 and #terms >= 3 then score -= 10 end
+				if isVendoredPath(lowerPath) then
+					if pathCoverage == 0 then score = -1 else score -= 60 end
+				end
+				if #source > 100000 then score -= 5 end
+			end
+			if score >= minimumScore then
+				table.insert(ranked, {
+					path = path,
+					source = source,
+					score = score,
+					coverage = coverage,
+					matchedTerms = matchedTerms,
+				})
+			end
+		end
+	end
+
+	table.sort(ranked, function(left, right)
+		if left.score == right.score then return left.path < right.path end
+		return left.score > right.score
+	end)
+
+	local output = {}
+	local includedScripts = 0
+	for _, item in ipairs(ranked) do
+		if includedScripts >= 12 then break end
+		includedScripts += 1
+		table.insert(output, "SCRIPT " .. item.path
+			.. " score=" .. tostring(item.score)
+			.. " matched=" .. table.concat(item.matchedTerms, ","))
+		local snippets = 0
+		for lineNumber, line in ipairs(string.split(item.source, "\n")) do
+			local matched = false
+			local lineCounts = termCounts(line, wanted)
+			for term in pairs(lineCounts) do
+				if wanted[term] then
+					matched = true
+					break
+				end
+			end
+			if matched then
+				local compact = trim(string.gsub(line, "%s+", " "))
+				if #compact > 220 then compact = string.sub(compact, 1, 217) .. "..." end
+				table.insert(output, tostring(lineNumber) .. ": " .. compact)
+				snippets += 1
+				if snippets >= 3 then break end
+			end
+		end
+	end
+	if #output == 0 then return "No live scripts matched: " .. table.concat(terms, ", ") end
+	return bounded(table.concat(output, "\n"), budget)
+end
+
 local function revision(hashSource: (string) -> string, source: string): number
 	return tonumber(hashSource(source), 16) or 0
 end
@@ -138,7 +277,13 @@ function AXL.create(dependencies: any): any
 			local taskText = tokens[1]
 			local budget = parseBudget(tokens, 2, 800)
 			local snapshot = dependencies.contextSnapshot()
-			local content = bounded(dependencies.jsonEncode(snapshot), budget)
+			local retrievalBudget = math.max(64, math.floor(budget * 0.7))
+			local stateBudget = math.max(64, budget - retrievalBudget)
+			local content = bounded(
+				"RELEVANT LIVE SCRIPTS\n" .. relevantScripts(taskText, retrievalBudget)
+					.. "\n\nSTUDIO STATE\n" .. bounded(dependencies.jsonEncode(snapshot), stateBudget),
+				budget
+			)
 			return "CTX $0 t=" .. tostring(estimateTokens(content)) .. "\nTASK " .. taskText .. "\n" .. content
 		elseif command == "find" then
 			if #tokens < 1 then error('Usage: find "query" budget=N') end

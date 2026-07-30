@@ -88,12 +88,18 @@ context "round can end twice" budget=700
 ```
 
 The budget is an approximate output-token ceiling, from 64 to 32,000. Abraxius
-returns a bounded AI context briefing:
+uses the task text to rank live scripts by path and source matches, includes up
+to three compact matching lines per relevant script, and then appends a bounded
+Studio-state snapshot. Relevant script evidence is placed first so a tight
+budget does not spend its best tokens on generic state:
 
 ```text
 CTX $18422112 t=694
 ...
 ```
+
+The retrieval is deterministic and read-only. It does not ask the model to
+guess which full scripts should be loaded, and it does not mutate Studio.
 
 ### Find
 

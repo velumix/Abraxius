@@ -5,7 +5,24 @@ module.exports = {
       type: "category",
       label: "Use Abraxius",
       collapsed: false,
-      items: ["installation", "windows-app", "sync"],
+      items: [
+        "installation",
+        {
+          type: "category",
+          label: "Windows app",
+          collapsed: false,
+          items: [
+            "windows-app",
+            "app-first-run",
+            "app-workspaces",
+            "app-change-review",
+            "app-commands",
+            "app-ai",
+            "app-troubleshooting",
+          ],
+        },
+        "sync",
+      ],
     },
     {
       type: "category",

@@ -27,6 +27,14 @@ test("plugin bundle preserves command registrations and safety contracts", () =>
   assert.ok(source.includes("protocolVersion = 6"));
   assert.ok(source.includes('"axl.core"'));
   assert.ok(source.includes('if pending then " pending=1" else " verified=1"'));
+  assert.ok(source.includes("RELEVANT LIVE SCRIPTS"));
+  assert.ok(source.includes("taskTerms(taskText)"));
+  assert.ok(source.includes("isVendoredPath(lowerPath)"));
+  assert.ok(source.includes("termCounts(source, wanted)"));
+  assert.ok(source.includes("if pathCoverage == 0 then score = -1"));
+  assert.ok(source.includes("if #terms >= 3 then 20 else 1"));
+  assert.ok(source.includes("coverage * 20"));
+  assert.ok(source.includes('matched=" .. table.concat(item.matchedTerms'));
 });
 
 test("plugin output uses the clean Abraxius logging grammar", () => {

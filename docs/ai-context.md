@@ -111,3 +111,20 @@ node cli.js ai-context --project ./game
 ## How AI agents should use it
 
 Treat pinned memory as durable project facts unless the user corrects it. Treat recent operations and Studio events as useful short-term context that may be stale. Always check pending pushes before assuming Studio has committed local edits.
+
+## In-app task retrieval
+
+Studio Copilot uses `context "<task>" budget=N` through AXL before each model
+request. AXL ranks live scripts against distinctive terms in the task and
+returns compact matching lines before a bounded Studio-state snapshot. This is
+the default in-app path because it gives small local models relevant evidence
+without repeatedly sending the entire place snapshot. The full snapshot
+remains available as an explicit supplement.
+
+When **Research mode** is enabled, Studio Copilot may follow the initial
+briefing with at most two structured planning rounds. Each proposal is
+validated against a fixed read-only allowlist before Abraxius sends compact AXL
+text to Studio. The loop permits no more than six deduplicated `find`,
+`read … symbols`, bounded `read … lines`, or `state` calls and stops after
+approximately 2,000 evidence tokens. Planning failure falls back to ordinary
+chat, and mutations remain in the separately approved Commands workflow.
