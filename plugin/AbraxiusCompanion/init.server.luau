@@ -19,7 +19,7 @@ local Logger = require(script.Logger)
 
 local PLUGIN_URL = "http://localhost:13471"
 local ANALYTICS_URL = "http://localhost:13472"
-local PLUGIN_VERSION = "1.8.1"
+local PLUGIN_VERSION = "1.8.6"
 local POLL_INTERVAL = 0.5
 local EVENT_LIMIT = 64
 local CONTEXT_SNAPSHOT_INTERVAL = 10
@@ -1889,7 +1889,15 @@ local function handleCommand(cmd: any): any
 	if not ok then
 		return { id = cmd.id, error = tostring(result) }
 	end
-	return { id = cmd.id, result = result }
+	local response = { id = cmd.id, result = result }
+	local serializable, encodeError = pcall(HttpService.JSONEncode, HttpService, response)
+	if not serializable then
+		return {
+			id = cmd.id,
+			error = "Command result is not JSON serializable: " .. tostring(encodeError),
+		}
+	end
+	return response
 end
 
 -- Source watching -----------------------------------------------------------
@@ -2047,8 +2055,10 @@ end
 
 -- Selection listener ---------------------------------------------------------
 local selectionConn: RBXScriptConnection? = nil
+local selectionPollRunning = false
+local uiRefreshRunning = false
 local function startSelectionListener()
-	if selectionConn then return end
+	if selectionConn or selectionPollRunning then return end
 	selectionConn = Selection.SelectionChanged:Connect(function()
 		local selected = Selection:Get()
 		local paths = {}
@@ -2056,6 +2066,29 @@ local function startSelectionListener()
 			table.insert(paths, (string.gsub(inst:GetFullName(), "^game%.", "")))
 		end
 		queueEvent({ type = "selection_changed", paths = paths })
+		updatePanel()
+	end)
+	local previous = ""
+	selectionPollRunning = true
+	task.spawn(function()
+		while selectionPollRunning do
+		local ok, selected = pcall(function() return Selection:Get() end)
+		if not ok then task.wait(0.5); continue end
+		local paths = {}
+		for _, inst in ipairs(selected) do
+			local pathOk, fullPath = pcall(function() return inst:GetFullName() end)
+			if pathOk then table.insert(paths, string.gsub(fullPath, "^game%.", "")) end
+		end
+		local signature = table.concat(paths, "\n")
+		if signature == previous then return end
+		previous = signature
+		if ui.selectionText then
+			ui.selectionText.Text = if #paths == 0 then "Nothing selected" else table.concat(paths, ", ")
+		end
+		queueEvent({ type = "selection_changed", paths = paths })
+		pcall(updatePanel)
+		task.wait(0.5)
+		end
 	end)
 end
 
@@ -2114,6 +2147,7 @@ local function stopSelectionListener()
 		selectionConn:Disconnect()
 		selectionConn = nil
 	end
+	selectionPollRunning = false
 end
 
 -- Main loop ------------------------------------------------------------------
@@ -2297,6 +2331,13 @@ local function init()
 	startWatching()
 	startSelectionListener()
 	startActivityListeners()
+	uiRefreshRunning = true
+	task.spawn(function()
+		while uiRefreshRunning do
+			pcall(updatePanel)
+			task.wait(0.25)
+		end
+	end)
 	lastMode = currentMode()
 	lastContextSnapshot = os.clock()
 	lastAnalyticsSnapshot = 0
@@ -2307,6 +2348,7 @@ local function init()
 		stopWatching()
 		stopSelectionListener()
 		stopActivityListeners()
+		uiRefreshRunning = false
 		if widget then
 			widget:Destroy()
 			widget = nil

@@ -8,7 +8,7 @@ use std::time::Duration;
 
 const API_PORT: u16 = 13470;
 const PLUGIN_FILE: &str = "AbraxiusCompanion.lua";
-const PLUGIN_VERSION: &str = "1.8.1";
+const PLUGIN_VERSION: &str = "1.8.6";
 const PLUGIN_BUNDLE: &str =
     include_str!("../../../plugin/AbraxiusCompanion/dist/AbraxiusCompanion.lua");
 

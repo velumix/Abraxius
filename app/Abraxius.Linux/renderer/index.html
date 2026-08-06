@@ -1,0 +1,1085 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+  <title>Abraxius Workstation</title>
+  <link rel="stylesheet" href="vendor/xterm/css/xterm.css">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <aside>
+    <div class="brand">
+      <img src="logo.png" alt="Abraxius Logo">
+      <div>
+        <strong>Abraxius</strong>
+        <small>Graphite Workstation</small>
+      </div>
+    </div>
+
+    <nav aria-label="Main Navigation">
+      <div class="nav-section-label">WORKBENCH</div>
+      <button class="nav active" data-page="home" title="Home Workstation Dashboard">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="3" width="7" height="7" rx="1.5"></rect><rect x="14" y="14" width="7" height="7" rx="1.5"></rect><rect x="3" y="14" width="7" height="7" rx="1.5"></rect></svg>
+        <span>Dashboard</span>
+      </button>
+
+      <button class="nav" data-page="sync" title="Studio Script Sync & Guarded Edits">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"></path></svg>
+        <span>Projects &amp; Sync</span>
+      </button>
+
+      <button class="nav" data-page="antigravity" title="Antigravity PTY Workspace">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+        <span>Workspace</span>
+      </button>
+
+      <button class="nav" data-page="activity" title="Studio Companion Signals">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 12 18 12 14 21 10 3 6 12 2 12"></polyline></svg>
+        <span>Tool Activity</span>
+      </button>
+
+      <div class="nav-section-label">AI ENGINES</div>
+      <button class="nav" data-page="ollama" title="Local Ollama LLM Workspace">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+        <span>Local Models</span>
+      </button>
+
+      <button class="nav" data-page="openrouter" title="Remote OpenRouter LLM Workspace">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+        <span>OpenRouter</span>
+      </button>
+
+      <button class="nav" data-page="nvidia-nim" title="NVIDIA NIM Nemotron Workspace">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"></rect><rect x="9" y="9" width="6" height="6"></rect><line x1="9" y1="1" x2="9" y2="4"></line><line x1="15" y1="1" x2="15" y2="4"></line></svg>
+        <span>NVIDIA NIM</span>
+      </button>
+
+      <button class="nav" data-page="memory" title="Abraxius Memory Core Hive Mind">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="5" rx="9" ry="3"></ellipse><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"></path><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"></path></svg>
+        <span>Memory Core</span>
+      </button>
+
+      <div class="nav-section-label">SYSTEM</div>
+      <button class="nav" data-page="diagnostics" title="Local Host Diagnostics">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg>
+        <span>Diagnostics</span>
+      </button>
+
+      <button class="nav" data-page="settings" title="Linux Workstation Settings">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+        <span>Settings</span>
+      </button>
+    </nav>
+
+    <div class="rail-footer">
+      <button class="rail-collapse-btn" id="rail-collapse-btn" title="Toggle Navigation Rail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="11 17 6 12 11 7"></polyline><polyline points="18 17 13 12 18 7"></polyline></svg>
+        <span>Collapse Rail</span>
+      </button>
+      <div class="rail-links">
+        <a href="https://github.com/Velumix/Abraxius" target="_blank" class="sky-link" title="Documentation & Usage">Docs</a>
+        <span class="sep">&middot;</span>
+        <a href="#" id="rail-feedback-link" class="sky-link" title="Send Feedback">Feedback</a>
+      </div>
+      <div class="rail-status" title="Local host server status">
+        <span id="rail-dot" class="status-dot waiting"></span>
+        <span id="rail-text">Starting host…</span>
+      </div>
+    </div>
+  </aside>
+
+  <main>
+    <!-- Top Application Bar -->
+    <div class="top-app-bar">
+      <div class="top-app-left">
+        <span class="top-app-mark">
+          <img src="logo.png" alt="Abraxius Logo" width="22" height="22">
+          <strong>Abraxius Workstation</strong>
+        </span>
+        <span class="top-app-pill">v1.1.0</span>
+      </div>
+
+      <div class="top-app-search">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="top-global-search" placeholder="Search commands, projects, models, or memories… (Ctrl+K)" aria-label="Global Workstation Search">
+        <kbd>Ctrl+K</kbd>
+      </div>
+
+      <div class="top-app-right">
+        <div class="top-app-chip" id="top-status-chip" title="Local host connection">
+          <span class="status-dot waiting" id="top-host-dot"></span>
+          <span id="top-host-text">Host connecting</span>
+        </div>
+        <button class="top-app-icon-btn" id="top-notifications-btn" title="View activity notifications" data-go="activity">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg>
+        </button>
+        <div class="top-app-profile" title="Abraxius Workstation Profile">
+          <span class="avatar-badge">AX</span>
+          <span class="profile-name">Velumix</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Page Header Bar -->
+    <header>
+      <div>
+        <h1 id="page-title">Dashboard</h1>
+        <p id="page-subtitle">Your Roblox Studio bridge &amp; AI workstation at a glance.</p>
+      </div>
+      <button id="refresh" title="Refresh host status">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+        <span>Refresh</span>
+      </button>
+    </header>
+
+    <div id="notice" role="status" aria-live="polite"></div>
+
+    <!-- 1. HOME / DASHBOARD PAGE -->
+    <section class="page active" id="home">
+      <!-- Top Status Cards Row (4 Cards) -->
+      <div class="workbench-status-grid">
+        <article class="status-card">
+          <div class="card-icon-wrap daemon-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="2" width="20" height="8" rx="2"></rect><rect x="2" y="14" width="20" height="8" rx="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
+          </div>
+          <div>
+            <small>DAEMON HOST</small>
+            <div class="card-status-title">
+              <span class="status-dot" id="server-dot"></span>
+              <h2 id="server-state">Starting</h2>
+            </div>
+            <p id="server-detail">Launching local host server</p>
+          </div>
+        </article>
+
+        <article class="status-card">
+          <div class="card-icon-wrap studio-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+          </div>
+          <div>
+            <small>ROBLOX STUDIO</small>
+            <div class="card-status-title">
+              <span class="status-dot" id="studio-dot"></span>
+              <h2 id="studio-state">Waiting</h2>
+            </div>
+            <p id="studio-detail">Studio MCP bridge channel</p>
+          </div>
+        </article>
+
+        <article class="status-card">
+          <div class="card-icon-wrap models-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+          </div>
+          <div>
+            <small>COMPANION PLUGIN</small>
+            <div class="card-status-title">
+              <span class="status-dot" id="plugin-dot"></span>
+              <h2 id="plugin-state">Waiting</h2>
+            </div>
+            <p id="plugin-detail">Plugin channel active</p>
+          </div>
+        </article>
+
+        <article class="status-card">
+          <div class="card-icon-wrap queue-icon">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+          </div>
+          <div>
+            <small>APPROVAL QUEUE</small>
+            <div class="card-status-title">
+              <span class="status-dot online" id="queue-dot"></span>
+              <h2>Guarded</h2>
+            </div>
+            <p>Tool execution safety active</p>
+          </div>
+        </article>
+      </div>
+
+      <!-- Multi-column Workbench Layout -->
+      <div class="workbench-columns">
+        <div class="workbench-main-col">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <small>STUDIO READINESS</small>
+                <h2>Connection Checklist</h2>
+              </div>
+              <span class="sky-badge">IPC Live</span>
+            </div>
+            <div id="checklist" class="checklist"></div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <small>VAULT PROJECTS &amp; SCRIPTS</small>
+                <h2>Script Synchronization</h2>
+              </div>
+              <button class="secondary small" data-go="sync">Open Sync &amp; Code &rarr;</button>
+            </div>
+            <p class="panel-desc">Map Luau scripts directly to Roblox Studio DataModel. Granular multi_edit diffs track draft mode changes safely.</p>
+            <div class="workbench-sync-quick">
+              <div class="quick-sync-stat">
+                <span class="stat-label">Mapped Directory</span>
+                <span class="stat-val">game/</span>
+              </div>
+              <div class="quick-sync-stat">
+                <span class="stat-label">Sync Protocol</span>
+                <span class="stat-val">AXL / Companion HTTP</span>
+              </div>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <small>EXECUTION LOG &amp; CONSOLE</small>
+                <h2>Workstation Console Log</h2>
+              </div>
+              <button class="secondary small" id="home-events-refresh">Refresh</button>
+            </div>
+            <div id="home-console-preview" class="console-log-area">
+              <div class="console-line info"><span class="log-tag">INFO</span> Workstation initialized with Graphite Amber skin.</div>
+              <div class="console-line success"><span class="log-tag">SUCCESS</span> Local host listening on localhost:45079.</div>
+            </div>
+          </article>
+        </div>
+
+        <div class="workbench-side-col">
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <small>QUICK ACTIONS</small>
+                <h2>Workstation Controls</h2>
+              </div>
+            </div>
+            <div class="actions">
+              <button data-go="antigravity" class="primary">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+                <span>Launch Antigravity PTY</span>
+              </button>
+              <button data-go="sync">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                <span>Pull / Push Luau Scripts</span>
+              </button>
+              <button data-go="activity">
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 14 21 10 3 6 12 2 12"></polyline></svg>
+                <span>View Tool Activity</span>
+              </button>
+              <button id="restart" class="secondary">Restart Local Host</button>
+            </div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <div>
+                <small>AI ENGINES</small>
+                <h2>Local Models &amp; Services</h2>
+              </div>
+            </div>
+            <div class="ai-status-list">
+              <div class="ai-status-item">
+                <span class="status-dot online"></span>
+                <div>
+                  <strong>Antigravity PTY</strong>
+                  <small>Local CLI process &amp; stream</small>
+                </div>
+                <span class="badge-amber">Ready</span>
+              </div>
+              <div class="ai-status-item">
+                <span class="status-dot waiting" id="home-ollama-dot"></span>
+                <div>
+                  <strong>Ollama LLM</strong>
+                  <small>Local HTTP :11434</small>
+                </div>
+                <span class="badge-sky" data-go="ollama">Manage</span>
+              </div>
+              <div class="ai-status-item">
+                <span class="status-dot online"></span>
+                <div>
+                  <strong>Memory Core</strong>
+                  <small>Hive mind :8765/mcp</small>
+                </div>
+                <span class="badge-green">Active</span>
+              </div>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. ACTIVITY PAGE -->
+    <section class="page" id="activity">
+      <article class="panel fill">
+        <div class="panel-head">
+          <div>
+            <small>LIVE SIGNALS</small>
+            <h2>Studio activity</h2>
+          </div>
+          <button id="activity-refresh">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+            <span>Refresh</span>
+          </button>
+        </div>
+        <div id="events" class="event-list empty">No companion events yet.</div>
+      </article>
+    </section>
+
+    <!-- 3. ANTIGRAVITY / WORKSPACE PAGE -->
+    <section class="page" id="antigravity">
+      <header class="agy-header-bar workspace-shell-header">
+        <div class="agy-status-strip">
+          <div class="workspace-breadcrumbs" title="Current location">
+            <span class="crumb-root">Workspace</span>
+            <span class="crumb-sep">/</span>
+            <span class="crumb-current" id="active-session-title">PTY Sessions</span>
+          </div>
+
+          <div class="agy-brand-tag" title="Abraxius Antigravity Bridge">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+            <span>Antigravity</span>
+          </div>
+
+          <span class="status-dot waiting" id="agy-dot" title="Session status"></span>
+          <strong id="agy-state">Connecting</strong>
+          <span class="agy-status-detail" id="agy-detail">Waiting for CLI</span>
+
+          <button id="agy-header-perm-badge" class="agy-perm-badge" title="Tool permission safety mode. Click to view session settings." aria-label="Tool permission settings">
+            <span class="status-dot" id="agy-permission-dot"></span>
+            <span id="agy-permission-state">Write enabled</span>
+          </button>
+
+          <span class="agy-pill" id="agy-pid-pill" title="Process ID of persistent PTY">PTY --</span>
+          <span class="agy-badge" id="agy-queue" title="Queued prompt tasks">0 queued</span>
+          <span class="agy-pill agy-privacy-pill" title="Local PTY &amp; IPC execution">Local Bridge</span>
+        </div>
+
+        <div class="agy-actions-strip">
+          <button id="open-command-palette" class="workspace-palette-btn" title="Open Command Palette (Ctrl+P)" aria-label="Open Command Palette">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>Palette</span>
+            <kbd>Ctrl+P</kbd>
+          </button>
+
+          <div class="agy-view-switcher" role="tablist" aria-label="Workspace View Modes">
+            <button id="agy-view-term" class="agy-view-btn active" role="tab" aria-selected="true" title="Maximize Interactive Terminal (Default)">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="4 17 10 11 4 5"></polyline><line x1="12" y1="19" x2="20" y2="19"></line></svg>
+              <span>Terminal</span>
+            </button>
+            <button id="agy-view-split" class="agy-view-btn" role="tab" aria-selected="false" title="Split Terminal &amp; Clean Response view">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"></rect><line x1="12" y1="3" x2="12" y2="21"></line></svg>
+              <span>Split</span>
+            </button>
+            <button id="agy-view-response" class="agy-view-btn" role="tab" aria-selected="false" title="Focus Clean Response Panel">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+              <span>Response</span>
+              <span class="agy-badge" id="agy-duration">Idle</span>
+            </button>
+          </div>
+
+          <button id="agy-toggle-search" class="agy-icon-btn" title="Find in terminal output (Ctrl+F)" aria-label="Find in terminal">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>Search</span>
+          </button>
+
+          <button id="agy-clear" class="agy-icon-btn" title="Clear terminal output stream (Ctrl+K)" aria-label="Clear terminal output">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <span class="agy-btn-label">Clear</span>
+          </button>
+
+          <details class="agy-overflow-menu" id="agy-overflow-details">
+            <summary class="agy-icon-btn" title="Session settings and lifecycle options" aria-label="Session settings menu">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1.2"></circle><circle cx="12" cy="5" r="1.2"></circle><circle cx="12" cy="19" r="1.2"></circle></svg>
+            </summary>
+            <div class="agy-dropdown-content" role="menu">
+              <div class="agy-menu-section">
+                <div class="agy-menu-header">Security &amp; Permissions</div>
+                <div class="agy-perm-box" title="Bypass tool permission prompts in Antigravity session">
+                  <div class="agy-perm-info">
+                    <span class="agy-perm-title">Unrestricted Write</span>
+                    <span class="agy-perm-sub">Bypass prompt approvals</span>
+                  </div>
+                  <label class="agy-switch">
+                    <input type="checkbox" id="agy-write-toggle" checked aria-label="Toggle tool write permissions">
+                    <span class="agy-slider"></span>
+                  </label>
+                  <span id="agy-permission-detail" class="sr-only">Changing this restarts the CLI session.</span>
+                </div>
+              </div>
+
+              <div class="agy-menu-divider"></div>
+
+              <div class="agy-menu-section">
+                <div class="agy-menu-header">Session Lifecycle</div>
+                <div class="agy-menu-actions">
+                  <button id="agy-interrupt" title="Interrupt current active prompt execution" disabled role="menuitem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    <span>Interrupt execution</span>
+                  </button>
+                  <button id="agy-restart" title="Restart persistent Antigravity CLI process" role="menuitem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                    <span>Restart CLI session</span>
+                  </button>
+                  <button id="agy-stop" class="danger" title="Stop CLI session process" role="menuitem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg>
+                    <span>Stop session</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div class="workspace-shortcut-strip">
+        <div class="shortcut-hints">
+          <span class="hint-item"><kbd>Ctrl+N</kbd> New PTY</span>
+          <span class="hint-item"><kbd>Ctrl+\</kbd> Split Pane</span>
+          <span class="hint-item"><kbd>Ctrl+P</kbd> Palette</span>
+          <span class="hint-item"><kbd>Ctrl+L</kbd> Clear</span>
+          <span class="hint-item"><kbd>Alt+1..9</kbd> Tabs</span>
+        </div>
+        <div class="workspace-quick-actions" aria-label="Repository Quick Workflows">
+          <span class="quick-actions-label">WORKFLOWS:</span>
+          <button class="quick-action-chip" data-cmd="npm run dev" title="Run dev server">npm run dev</button>
+          <button class="quick-action-chip" data-cmd="cargo check" title="Check Rust crate build">cargo check</button>
+          <button class="quick-action-chip" data-cmd="abraxius pull" title="Pull Luau scripts from Studio">Abraxius pull</button>
+          <button class="quick-action-chip" data-cmd="ollama list" title="List local Ollama models">Ollama list</button>
+          <button class="quick-action-chip" data-cmd="tail logs" title="View local host logs">Tail logs</button>
+          <button class="quick-action-chip" data-cmd="diagnostics" title="Run host diagnostics">Diagnostics</button>
+        </div>
+      </div>
+
+      <div class="pty-tab-bar" id="pty-tab-bar">
+        <div class="pty-tabs-scroll" id="pty-tabs-scroll">
+          <button class="pty-tab active" data-tab-id="agy-default">
+            <span class="status-dot online"></span>
+            <span class="pty-tab-name">Antigravity CLI</span>
+            <span class="pty-tab-kind">AGY</span>
+          </button>
+        </div>
+
+        <div class="pty-tab-bar-controls">
+          <button id="pty-new-tab-btn" class="pty-new-btn" title="Create New PTY Shell (Ctrl+N)">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            <span>+ New PTY</span>
+          </button>
+
+          <div class="pty-split-toggle" role="group" aria-label="Split Layout Toggle">
+            <button id="pty-split-single-btn" class="split-btn active" title="Single Pane Layout">1</button>
+            <button id="pty-split-h-btn" class="split-btn" title="Split Horizontal (Side-by-Side)">&#124;&#124;</button>
+            <button id="pty-split-v-btn" class="split-btn" title="Split Vertical (Top / Bottom)">&equals;</button>
+          </div>
+
+          <button id="pty-activity-toggle-btn" class="agy-icon-btn small" title="Toggle Activity Timeline">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="22 12 18 12 14 21 10 3 6 12 2 12"></polyline></svg>
+            <span>Activity</span>
+          </button>
+        </div>
+      </div>
+
+      <div class="agy-workspace-main view-term layout-single" id="agy-workspace-main">
+        <div class="agy-primary-pane" id="workspace-panes-wrapper">
+          <div class="workspace-pane focused" id="pane-1" data-pane-index="1">
+            <div class="pane-header">
+              <span class="pane-title" id="pane-1-title">Antigravity CLI</span>
+              <span class="pane-badge" id="pane-1-kind">AGY</span>
+              <div class="pane-controls">
+                <button class="pane-btn font-down-btn" data-pane="1" title="Decrease font size">-</button>
+                <button class="pane-btn font-up-btn" data-pane="1" title="Increase font size">+</button>
+                <button class="pane-btn clear-pane-btn" data-pane="1" title="Clear pane output">&#x232B;</button>
+              </div>
+            </div>
+
+            <article class="panel agy-composer">
+              <div class="agy-composer-wrap">
+                <div class="composer-mode-strip">
+                  <button class="mode-chip active" id="mode-chip-llm" title="Send as LLM Prompt to active model agent">
+                    <span class="dot amber"></span>
+                    <span>LLM Prompt</span>
+                  </button>
+                  <button class="mode-chip" id="mode-chip-shell" title="Execute as raw shell command in active PTY">
+                    <span class="dot sky"></span>
+                    <span>Shell Command</span>
+                  </button>
+                  <span class="composer-session-target" id="composer-target-label">Target: Antigravity CLI</span>
+                </div>
+
+                <textarea id="agy-prompt" rows="1" placeholder="Prompt Antigravity (e.g. request codebase analysis, run CLI task, edit scripts)…" spellcheck="true" aria-label="Antigravity prompt input"></textarea>
+                <div class="agy-composer-actions">
+                  <span class="hint" title="Press Ctrl+Enter to send prompt"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
+                  <button class="secondary small" id="composer-save-preset" title="Save to command presets">Save Preset</button>
+                  <button class="secondary small" id="composer-open-pty" title="Open and execute in a new PTY tab">Open in PTY</button>
+                  <button class="primary" id="agy-send" title="Send Prompt (Ctrl+Enter)">Send</button>
+                </div>
+              </div>
+            </article>
+
+            <article class="panel agy-terminal-panel">
+              <div id="agy-search-bar" class="terminal-search-bar" style="display: none;">
+                <input type="text" id="agy-search-input" placeholder="Find in terminal output… (Press Enter for next, Esc to close)" aria-label="Search Antigravity terminal">
+                <span class="search-match-count" id="agy-search-count">0 matches</span>
+                <button id="agy-search-prev" class="agy-icon-btn small" title="Previous match (Shift+Enter)">&uarr;</button>
+                <button id="agy-search-next" class="agy-icon-btn small" title="Next match (Enter)">&darr;</button>
+                <button id="agy-search-close" class="agy-icon-btn small" title="Close search (Esc)">&times;</button>
+              </div>
+              <div id="agy-terminal-container">
+                <div id="agy-terminal" role="log" aria-label="Antigravity terminal output"></div>
+              </div>
+            </article>
+          </div>
+
+          <div class="pane-resizer" id="pane-resizer" style="display: none;"></div>
+
+          <div class="workspace-pane" id="pane-2" data-pane-index="2" style="display: none;">
+            <div class="pane-header">
+              <span class="pane-title" id="pane-2-title">Secondary Terminal</span>
+              <span class="pane-badge" id="pane-2-kind">PTY</span>
+              <div class="pane-controls">
+                <button class="pane-btn font-down-btn" data-pane="2" title="Decrease font size">-</button>
+                <button class="pane-btn font-up-btn" data-pane="2" title="Increase font size">+</button>
+                <button class="pane-btn clear-pane-btn" data-pane="2" title="Clear pane output">&#x232B;</button>
+                <button class="pane-btn close-pane-btn" id="close-pane-2" title="Close secondary split pane">&times;</button>
+              </div>
+            </div>
+            <article class="panel agy-terminal-panel">
+              <div id="pane-2-terminal-container">
+                <div id="pane-2-terminal" role="log" aria-label="Secondary terminal output"></div>
+              </div>
+            </article>
+          </div>
+        </div>
+
+        <aside class="panel agy-response-panel" id="agy-response-drawer" aria-label="Latest Clean Response Drawer">
+          <div class="agy-response-head">
+            <div class="agy-response-title">
+              <small>CLEAN RESULT</small>
+              <h2>Latest Response</h2>
+            </div>
+            <div class="agy-response-actions">
+              <button id="agy-copy-response" title="Copy response text">Copy</button>
+              <button id="agy-close-response" class="agy-close-btn" title="Close Drawer (Esc)" aria-label="Close Response Drawer">&times;</button>
+            </div>
+          </div>
+          <div class="agy-response-wrap">
+            <pre id="agy-response">No response received yet.</pre>
+          </div>
+        </aside>
+      </div>
+
+      <div id="approval-queue-bar" class="approval-queue-container" style="display: none;">
+        <div class="approval-header">
+          <span class="status-dot waiting"></span>
+          <strong>AUTHORIZATION REQUIRED</strong>
+          <span class="approval-count" id="approval-queue-count">0 items pending</span>
+        </div>
+        <div id="approval-queue-list" class="approval-queue-items"></div>
+      </div>
+
+      <div id="activity-timeline-drawer" class="activity-timeline-panel" style="display: none;">
+        <div class="timeline-header">
+          <div>
+            <small>SESSION EXECUTION</small>
+            <h3>Activity Timeline</h3>
+          </div>
+          <button id="close-activity-timeline" class="agy-close-btn">&times;</button>
+        </div>
+        <div id="activity-timeline-list" class="timeline-items-list">
+          <div class="timeline-empty">No PTY activities logged yet.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. OLLAMA PAGE -->
+    <section class="page" id="ollama">
+      <header class="agy-header-bar">
+        <div class="agy-status-strip">
+          <div class="agy-brand-tag" title="Abraxius Ollama Workspace">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a10 10 0 1 0 10 10A10 10 0 0 0 12 2zm0 18a8 8 0 1 1 8-8 8 8 0 0 1-8 8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+            <span>Ollama</span>
+          </div>
+
+          <span class="status-dot waiting" id="ollama-dot" title="Ollama API Status"></span>
+          <strong id="ollama-state">Checking</strong>
+          <span class="agy-status-detail" id="ollama-detail">http://127.0.0.1:11434</span>
+
+          <span class="status-dot offline" id="ollama-pty-dot" title="Ollama PTY Session Status"></span>
+          <strong id="ollama-pty-state">PTY Stopped</strong>
+          <span class="agy-status-detail" id="ollama-pty-detail">PTY Session</span>
+
+          <span class="agy-pill" id="ollama-model-count-pill" title="Available models">0 models</span>
+          <span class="agy-badge" id="ollama-privacy-badge" title="Memory Privacy Policy">Local Execution</span>
+          <button id="ollama-access-badge" class="agy-perm-badge approval-required" title="Allow Ollama to use its configured local process and API" aria-label="Ollama local access permission">
+            <span class="status-dot" id="ollama-access-dot"></span>
+            <span id="ollama-access-state">Access blocked</span>
+          </button>
+        </div>
+
+        <div class="agy-actions-strip">
+          <div class="agy-view-switcher" id="ollama-view-toggle">
+            <button class="agy-view-btn active" data-ollama-view="chat" title="Structured API Chat View">Chat</button>
+            <button class="agy-view-btn" data-ollama-view="term" title="Interactive PTY Terminal View">Terminal</button>
+            <button class="agy-view-btn" data-ollama-view="split" title="Split Chat &amp; Terminal View">Split</button>
+          </div>
+
+          <div class="ollama-toolbar-controls">
+            <select id="ollama-model-select" class="ollama-select" title="Select loaded model">
+              <option value="">No models loaded</option>
+            </select>
+            <button id="ollama-open-pull-btn" class="agy-icon-btn" title="Pull/download model from Ollama library">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+              <span>Pull Model</span>
+            </button>
+            <button id="ollama-refresh-models" class="agy-icon-btn" title="Refresh available models">
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+              <span>Refresh</span>
+            </button>
+          </div>
+
+          <button id="ollama-toggle-search" class="agy-icon-btn" title="Find in PTY output (Ctrl+F)" aria-label="Find in PTY terminal">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            <span>Search</span>
+          </button>
+
+          <button id="ollama-clear" class="agy-icon-btn" title="Clear conversation (Ctrl+K)" aria-label="Clear chat">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>
+            <span class="agy-btn-label">Clear</span>
+          </button>
+
+          <details class="agy-overflow-menu" id="ollama-settings-details">
+            <summary class="agy-icon-btn" title="Ollama Settings &amp; Controls" aria-label="Ollama settings menu">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            </summary>
+            <div class="agy-dropdown-content" role="menu">
+              <div class="agy-menu-section">
+                <div class="agy-menu-header">PTY Session Controls</div>
+                <div class="agy-menu-actions">
+                  <button id="ollama-pty-interrupt" title="Interrupt current active PTY generation" disabled role="menuitem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>
+                    <span>Interrupt PTY</span>
+                  </button>
+                  <button id="ollama-pty-restart" title="Start or restart PTY Ollama session" role="menuitem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+                    <span>Start / Restart PTY</span>
+                  </button>
+                  <button id="ollama-pty-stop" class="danger" title="Stop PTY Ollama session" role="menuitem">
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="5" y="5" width="14" height="14" rx="2"></rect></svg>
+                    <span>Stop PTY</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="agy-menu-divider"></div>
+
+              <div class="agy-menu-section">
+                <div class="agy-menu-header">Ollama Configuration</div>
+                <div class="agy-perm-box ollama-access-box" title="Authorize only the configured Ollama executable and endpoint">
+                  <div class="agy-perm-info">
+                    <span class="agy-perm-title">Allow Local Ollama Access</span>
+                    <span class="agy-perm-sub">Required for chat, pulls, and PTY input</span>
+                  </div>
+                  <label class="agy-switch">
+                    <input type="checkbox" id="ollama-access-toggle" aria-label="Allow local Ollama access">
+                    <span class="agy-slider"></span>
+                  </label>
+                </div>
+                <p id="ollama-access-detail" class="ollama-access-detail">Access is blocked until you approve it. This does not disable Electron sandboxing or grant arbitrary shell access.</p>
+                <label class="ollama-menu-label">Endpoint URL
+                  <input type="text" id="ollama-set-endpoint" value="http://127.0.0.1:11434" spellcheck="false">
+                </label>
+                <label class="ollama-menu-label">Temperature
+                  <input type="number" id="ollama-set-temp" min="0" max="2" step="0.1" value="0.7">
+                </label>
+                <label class="ollama-menu-label">Context Size (num_ctx)
+                  <input type="number" id="ollama-set-ctx" min="512" max="131072" step="512" value="4096">
+                </label>
+                <label class="toggle"><input type="checkbox" id="ollama-set-memory" checked><span>Inject Memory Core Context</span></label>
+                <label class="toggle"><input type="checkbox" id="ollama-agent-toggle" checked><span>Agent loop: inspect, apply, verify</span></label>
+                <label class="toggle"><input type="checkbox" id="ollama-agent-mutations"><span>Allow agent edits (otherwise approval-required)</span></label>
+                <div class="agy-perm-box ollama-research-box">
+                  <div class="agy-perm-info"><span class="agy-perm-title">Allow Internet Research</span><span class="agy-perm-sub">Searches the web and gives untrusted sources to Ollama</span></div>
+                  <label class="agy-switch"><input type="checkbox" id="ollama-internet-toggle" aria-label="Allow Ollama internet research"><span class="agy-slider"></span></label>
+                </div>
+                <button class="primary small" id="ollama-save-settings-btn" style="margin-top: 8px;">Save Settings</button>
+              </div>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div id="ollama-pull-bar" class="ollama-pull-panel" style="display: none;">
+        <div class="ollama-pull-row">
+          <input type="text" id="ollama-pull-input" placeholder="Enter model tag to pull (e.g. qwen2.5-coder:7b, llama3.2:3b, mistral:7b)…" spellcheck="false">
+          <button class="primary small" id="ollama-pull-start-btn">Start Pull</button>
+          <button class="secondary small" id="ollama-pull-close-btn">&times;</button>
+        </div>
+        <div id="ollama-pull-progress-wrap" class="ollama-pull-progress-wrap" style="display: none;">
+          <div class="ollama-pull-info">
+            <span id="ollama-pull-status-text">Downloading manifest…</span>
+            <span id="ollama-pull-percent-text">0%</span>
+          </div>
+          <div class="progress-bar-bg"><div id="ollama-pull-progress-bar" class="progress-bar-fill" style="width: 0%;"></div></div>
+          <button class="danger small" id="ollama-pull-cancel-btn">Cancel</button>
+        </div>
+      </div>
+
+      <div class="ollama-workspace-main view-chat" id="ollama-workspace-main">
+        <article class="panel ollama-chat-panel" id="ollama-chat-panel">
+          <div id="ollama-chat-container" class="ollama-chat-history">
+            <div class="ollama-welcome-msg" id="ollama-welcome">
+              <div class="ollama-welcome-header">
+                <div class="ollama-welcome-title">Local Ollama LLM Workspace</div>
+                <p>Chat directly with your local LLM models inside Abraxius with active Memory Core retrieval.</p>
+              </div>
+              <div class="ollama-quick-prompts">
+                <button class="ollama-quick-card" data-prompt="Write a Luau Knit service script for handling player data and leaderstats in Roblox Studio.">
+                  <strong>Create Knit Service</strong>
+                  <span>Write a Luau leaderstats &amp; data service</span>
+                </button>
+                <button class="ollama-quick-card" data-prompt="Explain how Abraxius Memory Core isolates project context and prevents prompt injection.">
+                  <strong>Memory Core Architecture</strong>
+                  <span>Learn about privacy &amp; context isolation</span>
+                </button>
+                <button class="ollama-quick-card" data-prompt="Diagnose potential type checking warnings or script sync issues in Roblox Studio.">
+                  <strong>Debug Luau Code</strong>
+                  <span>Analyze script errors &amp; type annotations</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </article>
+
+        <article class="panel agy-terminal-panel" id="ollama-terminal-panel" style="display: none;">
+          <div id="ollama-search-bar" class="terminal-search-bar" style="display: none;">
+            <input type="text" id="ollama-search-input" placeholder="Find in PTY terminal output… (Press Enter for next, Esc to close)" aria-label="Search Ollama terminal">
+            <span class="search-match-count" id="ollama-search-count">0 matches</span>
+            <button id="ollama-search-prev" class="agy-icon-btn small" title="Previous match (Shift+Enter)">&uarr;</button>
+            <button id="ollama-search-next" class="agy-icon-btn small" title="Next match (Enter)">&darr;</button>
+            <button id="ollama-search-close" class="agy-icon-btn small" title="Close search (Esc)">&times;</button>
+          </div>
+          <div id="ollama-terminal-container">
+            <div id="ollama-terminal" role="log" aria-label="Ollama interactive terminal output"></div>
+          </div>
+        </article>
+
+        <article class="panel agy-composer" id="ollama-composer-panel">
+          <div class="agy-composer-wrap">
+            <textarea id="ollama-prompt" rows="1" placeholder="Chat with local Ollama model (e.g. ask questions, generate Luau scripts)…" spellcheck="true" aria-label="Ollama prompt input"></textarea>
+            <div class="agy-composer-actions">
+              <span class="hint" title="Press Ctrl+Enter to send prompt"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span>
+              <button class="danger" id="ollama-stop" disabled title="Stop generation">Stop</button>
+              <button class="primary" id="ollama-send" title="Send Prompt (Ctrl+Enter)">Send</button>
+            </div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <!-- 5. OPENROUTER PAGE -->
+    <section class="page openrouter-github" id="openrouter">
+      <header class="agy-header-bar">
+        <div class="agy-status-strip">
+          <div class="agy-brand-tag"><span>OpenRouter</span></div>
+          <span class="status-dot waiting" id="openrouter-dot"></span>
+          <strong id="openrouter-state">Ready to connect</strong>
+          <span class="agy-status-detail" id="openrouter-detail">https://openrouter.ai/api/v1</span>
+          <span class="agy-badge openrouter-key-badge" id="openrouter-key-state">&bullet; API key not set</span>
+          <span class="agy-pill agy-privacy-pill">Remote &middot; private memories excluded</span>
+        </div>
+        <div class="agy-actions-strip">
+          <select id="openrouter-filter-select" class="ollama-select" title="Filter model list">
+            <option value="all">All Models</option>
+            <option value="free" selected>Free Models Only</option>
+          </select>
+          <select id="openrouter-model-select" class="ollama-select" title="Select OpenRouter model"><option value="inclusionai/ling-3.0-flash:free">Ling-3.0-flash (free)</option></select>
+          <button id="openrouter-refresh-models" class="agy-icon-btn">Refresh Models</button>
+          <button id="openrouter-clear" class="agy-icon-btn">Clear</button>
+          <details class="agy-overflow-menu" id="openrouter-settings-details">
+            <summary class="agy-icon-btn openrouter-settings-button" aria-label="OpenRouter settings" title="OpenRouter settings">&#9881;</summary>
+            <div class="agy-dropdown-content" role="menu">
+              <div class="agy-menu-header">OpenRouter Configuration</div>
+              <label class="ollama-menu-label">API Key (encrypted in your OS credential store)<input type="password" id="openrouter-api-key" placeholder="sk-or-v1-…" autocomplete="off"></label>
+              <div class="agy-menu-actions"><button id="openrouter-save-key" class="primary small">Save Key</button><button id="openrouter-clear-key" class="danger small">Clear Key</button></div>
+              <label class="ollama-menu-label">Endpoint<input type="text" id="openrouter-endpoint" value="https://openrouter.ai/api/v1"></label>
+              <label class="ollama-menu-label">Temperature<input type="number" id="openrouter-temperature" min="0" max="2" step="0.1" value="0.7"></label>
+              <label class="ollama-menu-label">Max Retries (bounded 0&ndash;10)<input type="number" id="openrouter-max-retries" min="0" max="10" value="3"></label>
+              <label class="ollama-menu-label">Max Retry Delay (seconds)<input type="number" id="openrouter-max-backoff" min="5" max="120" value="30"></label>
+              <label class="toggle"><input type="checkbox" id="openrouter-use-memory" checked><span>Inject safe project memory</span></label>
+              <label class="toggle"><input type="checkbox" id="openrouter-allow-actions"><span>Allow write tools (ask before each action)</span></label>
+              <label class="toggle openrouter-yolo-toggle"><input type="checkbox" id="openrouter-yolo-mode"><span>YOLO mode &mdash; skip confirmations</span></label>
+              <p class="openrouter-yolo-warning">YOLO is session-only. The model may edit Studio without asking first.</p>
+              <p class="ollama-access-detail">OpenRouter requests automatically retry upon 429 throttling or transient errors with jitter, respecting provider wait times.</p>
+            </div>
+          </details>
+        </div>
+      </header>
+      <div class="openrouter-workspace">
+        <div id="openrouter-retry-banner" class="openrouter-retry-banner" style="display: none;" role="status">
+          <span class="status-dot waiting"></span>
+          <span id="openrouter-retry-text">Throttled by provider. Retrying…</span>
+          <button id="openrouter-cancel-retry" class="danger small">Cancel</button>
+        </div>
+        <article class="panel openrouter-chat-panel"><div id="openrouter-chat-container" class="ollama-chat-history"><div id="openrouter-welcome" class="ollama-welcome-msg"><div class="ollama-welcome-title">OpenRouter Workspace</div><p>Remote model access through OpenRouter with Abraxius Memory Core privacy rules.</p></div></div></article>
+        <article class="panel openrouter-activity-panel"><div class="panel-head"><div><small>OPENROUTER ACTIVITY</small><strong>HTTP stream console</strong></div><span class="agy-pill">live</span></div><pre id="openrouter-activity" class="openrouter-activity" aria-live="polite">OpenRouter activity will appear here…</pre></article>
+        <article class="panel agy-composer openrouter-composer"><div class="agy-composer-wrap"><textarea id="openrouter-prompt" rows="1" placeholder="Ask Ling-3.0-flash or another OpenRouter model…" aria-label="OpenRouter prompt input"></textarea><div class="agy-composer-actions"><span class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span><button id="openrouter-stop" class="danger" disabled aria-label="Stop streaming">Stop</button><button id="openrouter-send" class="primary" aria-label="Send message">Send</button></div></div></article>
+      </div>
+    </section>
+
+    <!-- 6. NVIDIA NIM PAGE -->
+    <section class="page openrouter-github" id="nvidia-nim">
+      <header class="agy-header-bar">
+        <div class="agy-status-strip">
+          <div class="agy-brand-tag"><span>NVIDIA NIM</span></div>
+          <span class="status-dot waiting" id="nim-dot"></span>
+          <strong id="nim-state">Ready to connect</strong>
+          <span class="agy-status-detail" id="nim-detail">https://integrate.api.nvidia.com/v1</span>
+          <span class="agy-badge openrouter-key-badge" id="nim-key-state">&bullet; API key not set</span>
+          <span class="agy-pill agy-privacy-pill">Remote &middot; reasoning enabled</span>
+        </div>
+        <div class="agy-actions-strip">
+          <select id="nim-model-select" class="ollama-select" title="Select NVIDIA NIM model"><option value="nvidia/nemotron-3-super-120b-a12b">Nemotron 3 Super 120B</option></select>
+          <button id="nim-clear" class="agy-icon-btn">Clear</button>
+          <details class="agy-overflow-menu" id="nim-settings-details">
+            <summary class="agy-icon-btn" aria-label="NVIDIA NIM settings" title="NVIDIA NIM settings">&#9881;</summary>
+            <div class="agy-dropdown-content" role="menu">
+              <div class="agy-menu-header">NVIDIA NIM Configuration</div>
+              <label class="ollama-menu-label">API Key (encrypted in your OS credential store)<input type="password" id="nim-api-key" placeholder="nvapi-…" autocomplete="off"></label>
+              <div class="agy-menu-actions"><button id="nim-save-key" class="primary small">Save Key</button><button id="nim-clear-key" class="danger small">Clear Key</button></div>
+              <label class="ollama-menu-label">Endpoint<input type="text" id="nim-endpoint" value="https://integrate.api.nvidia.com/v1"></label>
+              <label class="ollama-menu-label">Temperature<input type="number" id="nim-temperature" min="0" max="2" step="0.05" value="1"></label>
+              <label class="ollama-menu-label">Top P<input type="number" id="nim-top-p" min="0" max="1" step="0.05" value="0.95"></label>
+              <label class="ollama-menu-label">Max Tokens<input type="number" id="nim-max-tokens" min="1" value="16384"></label>
+              <label class="ollama-menu-label">Reasoning Budget<input type="number" id="nim-reasoning-budget" min="0" value="16384"></label>
+              <p class="ollama-access-detail">NVIDIA NIM credentials stay encrypted locally. Reasoning and answer text stream separately.</p>
+            </div>
+          </details>
+        </div>
+      </header>
+      <div class="openrouter-workspace">
+        <article class="panel openrouter-chat-panel"><div id="nim-chat-container" class="ollama-chat-history"><div id="nim-welcome" class="ollama-welcome-msg"><div class="ollama-welcome-title">NVIDIA NIM Workspace</div><p>Stream Nemotron reasoning and answers through NVIDIA’s OpenAI-compatible API.</p></div></div></article>
+        <article class="panel openrouter-activity-panel"><div class="panel-head"><div><small>REASONING TRACE</small><strong>NVIDIA NIM stream</strong></div><span class="agy-pill">live</span></div><pre id="nim-reasoning" class="openrouter-activity" aria-live="polite">Reasoning will appear here…</pre></article>
+        <article class="panel agy-composer openrouter-composer"><div class="agy-composer-wrap"><textarea id="nim-prompt" rows="1" placeholder="Ask Nemotron…" aria-label="NVIDIA NIM prompt input"></textarea><div class="agy-composer-actions"><span class="hint"><kbd>Ctrl</kbd>+<kbd>Enter</kbd></span><button id="nim-stop" class="danger" disabled aria-label="Stop NVIDIA NIM streaming">Stop</button><button id="nim-send" class="primary" aria-label="Send NVIDIA NIM message">Send</button></div></div></article>
+      </div>
+    </section>
+
+    <!-- 7. MEMORY CORE PAGE -->
+    <section class="page" id="memory">
+      <div class="status-grid">
+        <article class="status-card"><span class="status-dot online" id="mem-total-dot"></span><div><small>HIVE MIND</small><h2 id="mem-count-total">0 Memories</h2><p id="mem-total-detail">Stored durable records</p></div></article>
+        <article class="status-card"><span class="status-dot waiting" id="mem-proposed-dot"></span><div><small>REVIEW QUEUE</small><h2 id="mem-count-proposed">0 Proposed</h2><p id="mem-proposed-detail">Pending review entries</p></div></article>
+        <article class="status-card"><span class="status-dot online" id="mem-embed-dot"></span><div><small>EMBEDDINGS</small><h2 id="mem-embed-status">Ollama</h2><p id="mem-embed-detail">Hybrid search active</p></div></article>
+        <article class="status-card"><span class="status-dot online" id="mem-mcp-dot"></span><div><small>LOCAL MCP SERVER</small><h2 id="mem-mcp-status">:8765/mcp</h2><p id="mem-mcp-detail">Streamable HTTP active</p></div></article>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">
+          <div>
+            <small>ABRAXIUS MEMORY CORE</small>
+            <h2>Persistent Hive Mind</h2>
+          </div>
+          <div class="sub-nav-group">
+            <button class="mem-subnav active" data-subtab="browser">Browser</button>
+            <button class="mem-subnav" data-subtab="review">Review Queue (<span id="mem-review-badge">0</span>)</button>
+            <button class="mem-subnav" data-subtab="brief">Project Brief</button>
+            <button class="mem-subnav" data-subtab="indexer">Vault Indexer</button>
+            <button class="mem-subnav" data-subtab="mem-settings">Settings</button>
+          </div>
+        </div>
+
+        <div class="mem-tab-content active" id="mem-tab-browser">
+          <div class="mem-toolbar">
+            <input type="text" id="mem-search-query" placeholder="Search memories (hybrid semantic + keyword)…">
+            <select id="mem-filter-scope">
+              <option value="">All Scopes</option>
+              <option value="global">Global</option>
+              <option value="project">Project</option>
+              <option value="agent">Agent</option>
+              <option value="session">Session</option>
+              <option value="private">Private</option>
+            </select>
+            <select id="mem-filter-type">
+              <option value="">All Types</option>
+              <option value="preference">Preference</option>
+              <option value="project_fact">Project Fact</option>
+              <option value="requirement">Requirement</option>
+              <option value="technical_decision">Decision</option>
+              <option value="known_issue">Known Issue</option>
+              <option value="failed_attempt">Failed Attempt</option>
+              <option value="successful_fix">Successful Fix</option>
+              <option value="procedure">Procedure</option>
+              <option value="pending_task">Pending Task</option>
+            </select>
+            <button class="primary" id="mem-open-add-modal">+ Add Memory</button>
+          </div>
+          <div id="mem-cards-list" class="mem-cards-grid">Loading memories…</div>
+        </div>
+
+        <div class="mem-tab-content" id="mem-tab-review">
+          <div class="mem-section-desc">Extracted memories waiting for human approval or correction.</div>
+          <div id="mem-proposed-list" class="mem-cards-grid">No proposed memories pending review.</div>
+        </div>
+
+        <div class="mem-tab-content" id="mem-tab-brief">
+          <div class="mem-section-desc">Structured overview of durable facts, architectural decisions, and tasks for the active project.</div>
+          <div id="mem-brief-container" class="mem-brief-grid">Select a project to load brief.</div>
+        </div>
+
+        <div class="mem-tab-content" id="mem-tab-indexer">
+          <div class="mem-section-desc">Opt-in Markdown folder &amp; Obsidian vault indexing. Scans approved directories incrementally.</div>
+          <div class="mem-form-row">
+            <input type="text" id="mem-index-dir-input" placeholder="/path/to/my-obsidian-vault">
+            <button class="primary" id="mem-index-dir-btn">Approve &amp; Index Directory</button>
+          </div>
+          <div id="mem-index-status" class="mem-status-box">No indexing job run yet.</div>
+        </div>
+
+        <div class="mem-tab-content" id="mem-tab-mem-settings">
+          <div class="two-column">
+            <div class="settings-col">
+              <label class="toggle"><input type="checkbox" id="mem-set-enabled" checked><span>Enable Abraxius Memory Core</span></label>
+              <label class="toggle"><input type="checkbox" id="mem-set-autoreview"><span>Auto-approve extracted memories</span></label>
+              <label>Embedding Provider
+                <select id="mem-set-embed-provider">
+                  <option value="ollama">Ollama Embeddings</option>
+                  <option value="keyword">Keyword Fallback Only</option>
+                </select>
+              </label>
+              <label>Ollama Host<input type="text" id="mem-set-ollama-host" value="http://127.0.0.1:11434"></label>
+              <label>Ollama Model<input type="text" id="mem-set-ollama-model" value="nomic-embed-text"></label>
+            </div>
+            <div class="settings-col">
+              <label>Cloud Model Privacy Policy
+                <select id="mem-set-cloud-policy">
+                  <option value="never_cloud">Never transmit private memories to cloud models</option>
+                  <option value="local_only">Local models only</option>
+                  <option value="allow">Allow explicit transmission</option>
+                </select>
+              </label>
+              <label>Local MCP Server Port<input type="number" id="mem-set-mcp-port" value="8765"></label>
+              <label class="toggle"><input type="checkbox" id="mem-set-mcp-lan"><span>Allow LAN Access (requires Auth Token)</span></label>
+              <button class="primary" id="mem-save-settings-btn">Save Settings</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- 8. SYNC & CODE PAGE -->
+    <section class="page" id="sync">
+      <div class="two-column sync-grid">
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <small>PROJECT SYNC</small>
+              <h2>Pull from Studio</h2>
+            </div>
+          </div>
+          <label>Destination directory<input id="pull-dir" value="game" spellcheck="false"></label>
+          <label>Optional Studio target<input id="pull-target" placeholder="ServerScriptService.KnitServer" spellcheck="false"></label>
+          <button class="primary" id="pull">Pull scripts</button>
+        </article>
+
+        <article class="panel">
+          <div class="panel-head">
+            <div>
+              <small>GUARDED APPLY</small>
+              <h2>Push mapped script</h2>
+            </div>
+          </div>
+          <label>Mapped Luau file<input id="push-file" placeholder="game/src/ServerScriptService/KnitServer.server.luau" spellcheck="false"></label>
+          <p class="hint">Push computes narrow edits, uses MCP multi_edit once, and tracks Draft Mode changes.</p>
+          <button class="primary" id="push">Preview and push</button>
+        </article>
+      </div>
+
+      <article class="panel console-panel">
+        <div class="panel-head">
+          <div>
+            <small>COMMAND OUTPUT</small>
+            <h2>Sync result</h2>
+          </div>
+          <button id="pending-refresh">Pending changes</button>
+        </div>
+        <pre id="command-output">Ready.</pre>
+      </article>
+    </section>
+
+    <!-- 9. DIAGNOSTICS PAGE -->
+    <section class="page" id="diagnostics">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <small>LOCAL SUPPORT</small>
+            <h2>Diagnostics</h2>
+          </div>
+        </div>
+        <p>Host output is stored locally and excludes editor buffers and source code.</p>
+        <div class="actions horizontal">
+          <button id="open-log">Open host log</button>
+          <button id="open-data">Open data folder</button>
+          <button id="health-json">Copy health snapshot</button>
+        </div>
+        <pre id="diagnostic-output">Select an action above.</pre>
+      </article>
+    </section>
+
+    <!-- 10. SETTINGS PAGE -->
+    <section class="page" id="settings">
+      <article class="panel">
+        <div class="panel-head">
+          <div>
+            <small>APPLICATION</small>
+            <h2>Linux behavior</h2>
+          </div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="autostart">
+          <span>Start Abraxius when I sign in</span>
+        </label>
+        <p class="hint">Closing the window keeps Abraxius in the notification area. Use the tray menu to quit.</p>
+      </article>
+    </section>
+  </main>
+
+  <!-- Global Command Palette Modal Overlay -->
+  <div id="command-palette-modal" class="palette-modal-backdrop" style="display: none;" role="dialog" aria-modal="true" aria-label="Command Palette">
+    <div class="palette-dialog">
+      <div class="palette-input-wrap">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+        <input type="text" id="palette-search-input" placeholder="Type a command or search workspace actions… (Esc to close)" autocomplete="off" spellcheck="false" aria-label="Command palette search">
+        <kbd>Esc</kbd>
+      </div>
+      <div id="palette-results-list" class="palette-results-list" role="listbox">
+        <!-- Palette action items dynamically populated -->
+      </div>
+      <div class="palette-footer">
+        <span><kbd>&uarr;</kbd> <kbd>&darr;</kbd> Navigate</span>
+        <span><kbd>Enter</kbd> Select</span>
+        <span><kbd>Esc</kbd> Dismiss</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Terminal Context Menu -->
+  <div id="terminal-context-menu" class="context-menu-dropdown" style="display: none;" role="menu">
+    <button class="ctx-item" id="ctx-copy" role="menuitem">Copy Selected Text</button>
+    <button class="ctx-item" id="ctx-paste" role="menuitem">Paste into Terminal</button>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item" id="ctx-clear" role="menuitem">Clear Terminal</button>
+    <button class="ctx-item" id="ctx-search" role="menuitem">Search Terminal Output</button>
+    <div class="ctx-divider"></div>
+    <button class="ctx-item" id="ctx-font-up" role="menuitem">Increase Font Size</button>
+    <button class="ctx-item" id="ctx-font-down" role="menuitem">Decrease Font Size</button>
+    <button class="ctx-item" id="ctx-select-all" role="menuitem">Select All</button>
+  </div>
+
+  <script src="vendor/xterm/lib/xterm.js" data-pkg="@xterm/xterm"></script>
+  <script src="vendor/addon-fit/lib/addon-fit.js" data-pkg="@xterm/addon-fit"></script>
+  <script src="vendor/addon-web-links/lib/addon-web-links.js" data-pkg="@xterm/addon-web-links"></script>
+  <script src="vendor/addon-search/lib/addon-search.js" data-pkg="@xterm/addon-search"></script>
+  <script src="tauri-bridge.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

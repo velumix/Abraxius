@@ -148,13 +148,15 @@ node cli.js pending verify
 node cli.js pending clear
 ```
 
+If the Studio companion or host app is disconnected during `pending verify`, Abraxius returns an actionable diagnostic (`reason: "companion_disconnected"` or `"host_disconnected"`) without corrupting pending push records to an error state.
+
 Statuses:
 
 | Status | Meaning |
 |---|---|
 | `pending` | MCP accepted the edit and Abraxius recorded the intended source, but commit is not verified yet |
 | `live` | Studio source matches the pushed source |
-| `error` | Plugin disconnected or command failed |
+| `error` | Verification query failed due to invalid path or script error |
 
 ## AI context tie-in
 

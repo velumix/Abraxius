@@ -1,0 +1,82 @@
+{
+  "version": "axl/1",
+  "valid": [
+    {
+      "name": "hello with project hint",
+      "source": "hello axl/1 project=4",
+      "type": "hello"
+    },
+    {
+      "name": "budgeted task context",
+      "source": "context \"round ends twice\" budget=700",
+      "type": "context"
+    },
+    {
+      "name": "budgeted source search",
+      "source": "find \"EndRound\" budget=500",
+      "type": "find"
+    },
+    {
+      "name": "revisioned line read",
+      "source": "read game.ServerScriptService.MatchManager@42 lines 8..19",
+      "type": "read"
+    },
+    {
+      "name": "exact patch",
+      "source": "patch game.ServerScriptService.Main@42\nold <<OLD\nlocal speed = 10\nOLD\nnew <<NEW\nlocal speed = 20\nNEW",
+      "type": "patch"
+    },
+    {
+      "name": "edit mode heredoc execution",
+      "source": "execute <<LUAU mode=Edit\nreturn workspace.Name\nLUAU",
+      "type": "execute"
+    },
+    {
+      "name": "global state",
+      "source": "state",
+      "type": "state"
+    },
+    {
+      "name": "reserved operation undo",
+      "source": "undo %12",
+      "type": "undo"
+    }
+  ],
+  "invalid": [
+    {
+      "name": "unknown command",
+      "source": "invent game.Workspace",
+      "code": "COMMAND"
+    },
+    {
+      "name": "budget below protocol floor",
+      "source": "find \"round\" budget=12",
+      "code": "VALUE"
+    },
+    {
+      "name": "patch without revision",
+      "source": "patch game.ServerScriptService.Main",
+      "code": "REVISION"
+    },
+    {
+      "name": "backwards line range",
+      "source": "read game.ServerScriptService.Main lines 10..2",
+      "code": "VALUE"
+    },
+    {
+      "name": "unterminated quote",
+      "source": "context \"round",
+      "code": "SYNTAX"
+    }
+  ],
+  "productionVerbs": [
+    "hello",
+    "context",
+    "find",
+    "read",
+    "patch",
+    "execute",
+    "state",
+    "undo"
+  ]
+}

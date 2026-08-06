@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 const path = require("path");
 const fs = require("fs");
+const { spawn } = require("node:child_process");
 const { MCPClient } = require("./client");
 const logger = require("./lib/logger");
 const { Puller } = require("./lib/pull");
@@ -18,6 +19,11 @@ const {
   fetchGitHubContext,
   toGitHubMarkdown,
 } = require("./lib/github-context");
+const { ABRAXIUS_NOTICE, getHumanNotice } = require("./lib/mcp-notice");
+const { runMcpStdioServer } = require("./lib/mcp-server");
+const { OpenRouterClient, DEFAULT_MODEL: DEFAULT_OPENROUTER_MODEL } = require("./lib/openrouter");
+const { NvidiaNimClient, DEFAULT_MODEL: DEFAULT_NVIDIA_NIM_MODEL } = require("./lib/nvidia-nim");
+const { getNimBridgeInfo } = require("./lib/nvidia-nim-bridge");
 
 const studioEmoji = {
   tools: String.fromCodePoint(0x1f9f0),
@@ -39,7 +45,12 @@ const studioLog = (icon, message) => `${icon} ${message}`;
 const USAGE = `
 Usage: mcp <command> [args]
 
-App host:
+App host & MCP server:
+  stdio                 Start stdio MCP server for generic LLM CLIs
+  openrouter <prompt>   Send a prompt through OpenRouter (uses OPENROUTER_API_KEY)
+  nim <prompt>          Stream a prompt through NVIDIA NIM (uses NVIDIA_NIM_API_KEY)
+  nvidia-nim <prompt>   Alias for nim
+  discovery             Print machine-readable capability manifest & notice
   start                 Confirm the Abraxius App host is running
   stop                  Explain how to stop the host from the app
   status                Check the app-supervised host and Studio connections
@@ -133,13 +144,21 @@ function parseOptions(argv) {
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
     if (arg === "--project") {
-      out.projectDir = argv[++i];
+      const val = argv[++i];
+      if (val !== undefined) out.projectDir = val;
+      else throw new Error("Missing value after --project");
     } else if (arg === "--tag") {
-      out.tags.push(argv[++i]);
+      const val = argv[++i];
+      if (val !== undefined) out.tags.push(val);
+      else throw new Error("Missing value after --tag");
     } else if (arg === "--path") {
-      out.path = argv[++i];
+      const val = argv[++i];
+      if (val !== undefined) out.path = val;
+      else throw new Error("Missing value after --path");
     } else if (arg === "--json") {
       out.json = true;
+    } else if (arg.startsWith("--")) {
+      throw new Error(`Unknown option: ${arg}`);
     } else {
       out._.push(arg);
     }
@@ -196,11 +215,182 @@ async function withDaemonClient(fn) {
   return fn(new MCPClient());
 }
 
+function tryRunNvidiaNimViaAppBridge(prompt) {
+  return new Promise((resolve, reject) => {
+    const userDataDir = path.join(require("os").homedir(), ".config", "Abraxius");
+    const info = getNimBridgeInfo(userDataDir);
+    if (!info || !info.port || !info.token) return resolve(false);
+
+    const http = require("http");
+    const healthReq = http.request(
+      `http://127.0.0.1:${info.port}/health`,
+      { method: "GET", headers: { Authorization: `Bearer ${info.token}` }, timeout: 1000 },
+      (res) => {
+        if (res.statusCode !== 200) return resolve(false);
+        let body = "";
+        res.on("data", (chunk) => { body += chunk; });
+        res.on("end", () => {
+          let data;
+          try { data = JSON.parse(body); } catch { return resolve(false); }
+          if (!data || data.hasApiKey !== true) return resolve(false);
+
+          const req = http.request(
+            `http://127.0.0.1:${info.port}/v1/nim/chat`,
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${info.token}`,
+              },
+            },
+            (streamRes) => {
+              if (streamRes.statusCode !== 200) {
+                let errBody = "";
+                streamRes.on("data", (c) => { errBody += c; });
+                streamRes.on("end", () => reject(new Error(`NVIDIA NIM app bridge returned HTTP ${streamRes.statusCode}: ${errBody}`)));
+                return;
+              }
+
+              let buffer = "";
+              let eventName = "";
+
+              const onSigInt = () => {
+                req.destroy();
+                reject(new Error("NVIDIA NIM prompt cancelled by user."));
+              };
+              process.once("SIGINT", onSigInt);
+
+              streamRes.on("data", (chunk) => {
+                buffer += chunk.toString("utf8");
+                const lines = buffer.split(/\r?\n/);
+                buffer = lines.pop() || "";
+
+                for (const line of lines) {
+                  const trimmed = line.trim();
+                  if (!trimmed) continue;
+                  if (trimmed.startsWith("event:")) {
+                    eventName = trimmed.slice(6).trim();
+                  } else if (trimmed.startsWith("data:")) {
+                    let payload;
+                    try { payload = JSON.parse(trimmed.slice(5).trim()); } catch {}
+                    if ((eventName === "reasoning" || eventName === "chunk") && payload?.chunk) {
+                      process.stdout.write(payload.chunk);
+                    } else if (eventName === "error" && payload?.error) {
+                      process.removeListener("SIGINT", onSigInt);
+                      return reject(new Error(payload.error));
+                    }
+                  }
+                }
+              });
+
+              streamRes.on("end", () => {
+                process.removeListener("SIGINT", onSigInt);
+                process.stdout.write("\n");
+                resolve(true);
+              });
+              streamRes.on("error", (err) => {
+                process.removeListener("SIGINT", onSigInt);
+                reject(err);
+              });
+            },
+          );
+
+          req.on("error", () => resolve(false));
+          req.write(JSON.stringify({ prompt }));
+          req.end();
+        });
+      },
+    );
+
+    healthReq.on("error", () => resolve(false));
+    healthReq.on("timeout", () => { healthReq.destroy(); resolve(false); });
+    healthReq.end();
+  });
+}
+
+function runNvidiaNimWithSavedAppKey(prompt) {
+  return new Promise((resolve, reject) => {
+    const electronPath = process.env.ELECTRON_BIN || path.join(__dirname, "node_modules", "electron", "dist", "electron");
+    if (!fs.existsSync(electronPath)) return reject(new Error("Electron runtime not found. Set ELECTRON_BIN or configure NVIDIA_NIM_API_KEY."));
+    const { ELECTRON_RUN_AS_NODE, ...helperEnv } = process.env;
+    const child = spawn(electronPath, [path.join(__dirname, "scripts", "nvidia-nim-app-key.js"), prompt], { env: helperEnv, stdio: ["ignore", "inherit", "inherit"] });
+    child.once("error", reject);
+    child.once("exit", (code) => code === 0 ? resolve() : reject(new Error(`NVIDIA NIM helper exited with code ${code}`)));
+  });
+}
+
 async function main() {
   const [, , command, ...args] = process.argv;
 
   try {
     switch (command) {
+      case "stdio":
+      case "serve":
+      case "mcp-server":
+      case "serve-mcp":
+        runMcpStdioServer();
+        break;
+
+      case "discovery":
+      case "discover":
+      case "manifest":
+      case "info": {
+        const output = {
+          abraxius: ABRAXIUS_NOTICE,
+          notice: getHumanNotice(),
+        };
+        console.log(JSON.stringify(output, null, 2));
+        break;
+      }
+
+      case "openrouter": {
+        const prompt = args.join(" ").trim();
+        if (!prompt) throw new Error("Usage: mcp openrouter <prompt>");
+        if (!process.env.OPENROUTER_API_KEY) {
+          throw new Error("OPENROUTER_API_KEY is not configured. Set it in the Abraxius process environment; the key is never printed or persisted.");
+        }
+        const model = process.env.OPENROUTER_MODEL || DEFAULT_OPENROUTER_MODEL;
+        const client = new OpenRouterClient({
+          apiKey: process.env.OPENROUTER_API_KEY,
+          endpoint: process.env.OPENROUTER_ENDPOINT,
+        });
+        await client.streamChat({
+          model,
+          messages: [{ role: "user", content: prompt }],
+          onChunk: (chunk) => process.stdout.write(chunk),
+        });
+        process.stdout.write("\n");
+        break;
+      }
+
+      case "nim":
+      case "nvidia-nim": {
+        const prompt = args.join(" ").trim();
+        if (!prompt) throw new Error("Usage: mcp nim <prompt>");
+        if (!process.env.NVIDIA_NIM_API_KEY) {
+          const bridged = await tryRunNvidiaNimViaAppBridge(prompt);
+          if (bridged) break;
+          await runNvidiaNimWithSavedAppKey(prompt);
+          break;
+        }
+        const client = new NvidiaNimClient({
+          apiKey: process.env.NVIDIA_NIM_API_KEY,
+          endpoint: process.env.NVIDIA_NIM_ENDPOINT,
+          model: process.env.NVIDIA_NIM_MODEL || DEFAULT_NVIDIA_NIM_MODEL,
+          temperature: process.env.NVIDIA_NIM_TEMPERATURE,
+          topP: process.env.NVIDIA_NIM_TOP_P,
+          maxTokens: process.env.NVIDIA_NIM_MAX_TOKENS,
+          reasoningBudget: process.env.NVIDIA_NIM_REASONING_BUDGET,
+        });
+        await client.streamChat({
+          messages: [{ role: "user", content: prompt }],
+          onReasoning: (chunk) => process.stdout.write(chunk),
+          onChunk: (chunk) => process.stdout.write(chunk),
+        });
+        process.stdout.write("\n");
+        break;
+      }
+
       case "start":
         if (await probeDaemon()) logger.success("Abraxius App host is running");
         else throw new Error("Launch Abraxius from Windows. Host lifecycle belongs to the app.");
@@ -214,6 +404,7 @@ async function main() {
       }
 
       case "status": {
+        logger.info(getHumanNotice());
         const health = await probeDaemon();
         const running = !!health;
         logger.info(running ? "Daemon is running" : "Daemon is not running");
@@ -606,8 +797,21 @@ async function main() {
       case "pending": {
         const sub = args[0];
         if (sub === "verify") {
-          const result = await withClient(async (c) => c.pendingVerify());
-          console.log(JSON.stringify(result, null, 2));
+          try {
+            const result = await withClient(async (c) => c.pendingVerify());
+            console.log(JSON.stringify(result, null, 2));
+          } catch (err) {
+            if (err.code === "ECONNREFUSED" || err.message?.includes("fetch failed") || err.message?.includes("ECONNREFUSED") || err.message?.includes("connect")) {
+              console.log(JSON.stringify({
+                ok: false,
+                reason: "host_disconnected",
+                error: "Cannot verify pending edits: Abraxius app host is disconnected. Start Abraxius.App or run 'node server.js start'.",
+                connected: false,
+              }, null, 2));
+            } else {
+              throw err;
+            }
+          }
         } else if (sub === "clear") {
           const pathArg = args[1];
           const result = await withClient(async (c) => c.pendingClear(pathArg));
@@ -700,4 +904,11 @@ async function repl() {
   rl.close();
 }
 
-main();
+if (require.main === module) {
+  main();
+}
+
+module.exports = {
+  parseOptions,
+  USAGE,
+};

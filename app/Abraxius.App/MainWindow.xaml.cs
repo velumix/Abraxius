@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
     private static readonly Uri AnalyticsBase = new("http://127.0.0.1:13472/");
 
     private readonly HttpClient _http = new() { BaseAddress = ApiBase, Timeout = TimeSpan.FromSeconds(1) };
+    private readonly HttpClient _studioHttp = new() { BaseAddress = ApiBase, Timeout = TimeSpan.FromSeconds(35) };
     private readonly HttpClient _analytics = new() { BaseAddress = AnalyticsBase, Timeout = TimeSpan.FromSeconds(1) };
     private readonly Dictionary<int, ProcessSample> _processSamples = new();
     private readonly DispatcherTimer _timer = new() { Interval = TimeSpan.FromSeconds(2) };
@@ -51,6 +52,9 @@ public sealed partial class MainWindow : Window
     private readonly ObservableCollection<ScriptActivityRow> _scriptActivityItems = new();
     private readonly ObservableCollection<CommandHistoryRow> _commandHistoryItems = new();
     private readonly ObservableCollection<ApprovalQueueRow> _approvalQueueItems = new();
+    private readonly ObservableCollection<ChangeReviewRow> _changeReviewItems = new();
+    private readonly HashSet<string> _dismissedReviewKeys = new(StringComparer.Ordinal);
+    private EditorRollback? _lastEditorRollback;
     private readonly ObservableCollection<ScriptExplorerRow> _scriptExplorerItems = new();
     private readonly Dictionary<string, EditorDocument> _editorDocuments = new(StringComparer.Ordinal);
     private readonly IAiProvider _aiProvider = new GuardedAiProvider(new OllamaProvider());
@@ -97,6 +101,8 @@ public sealed partial class MainWindow : Window
         ScriptActivityList.ItemsSource = _scriptActivityItems;
         CommandHistoryList.ItemsSource = _commandHistoryItems;
         ApprovalQueueList.ItemsSource = _approvalQueueItems;
+        _approvalQueueItems.CollectionChanged += (_, _) => UpdateApprovalQueueState();
+        ChangeReviewList.ItemsSource = _changeReviewItems;
         ScriptExplorerList.ItemsSource = _scriptExplorerItems;
         AiMemoryList.ItemsSource = _aiMemories;
         IntelligenceTimelineList.ItemsSource = _intelligenceTimeline;
@@ -579,6 +585,7 @@ public sealed partial class MainWindow : Window
         OutputPage.Visibility = tag == "output" ? Visibility.Visible : Visibility.Collapsed;
         ScriptsPage.Visibility = tag == "scripts" ? Visibility.Visible : Visibility.Collapsed;
         CodePage.Visibility = tag == "code" ? Visibility.Visible : Visibility.Collapsed;
+        ReviewPage.Visibility = tag == "review" ? Visibility.Visible : Visibility.Collapsed;
         AiPage.Visibility = tag == "ai" ? Visibility.Visible : Visibility.Collapsed;
         CommandsPage.Visibility = tag == "commands" ? Visibility.Visible : Visibility.Collapsed;
         SettingsPage.Visibility = tag == "settings" ? Visibility.Visible : Visibility.Collapsed;
@@ -589,6 +596,10 @@ public sealed partial class MainWindow : Window
         if (tag == "code" && !_scriptExplorerLoaded)
         {
             _ = RefreshScriptExplorerAsync();
+        }
+        if (tag == "review")
+        {
+            _ = RefreshChangeReviewAsync();
         }
         if (tag == "ai" && !_aiInitialized)
         {
@@ -657,13 +668,30 @@ public sealed partial class MainWindow : Window
         try
         {
             var stopwatch = Stopwatch.StartNew();
-            var context = await BuildAiContextAsync();
-            var estimatedInputTokens = Math.Max(1, context.Length / 4);
-            AiContextSizeText.Text = $"~{estimatedInputTokens:N0} input tokens • {model.Name}";
+            var context = await BuildAiContextAsync(prompt, model);
+            if (AiResearchModeToggle.IsOn && _lastHealth?.PluginConnected == true)
+            {
+                AiResearchReceiptText.Text = "Researching live Studio evidence…";
+                var research = await RunAiResearchAsync(model, prompt, context, _aiCancellation.Token);
+                AiResearchReceiptText.Text = research.Receipt;
+                if (!string.IsNullOrWhiteSpace(research.Evidence))
+                {
+                    context = LimitContext(
+                        context + "\n\nREAD-ONLY AXL RESEARCH EVIDENCE:\n" + research.Evidence,
+                        AiContextMaximumCharacters(model));
+                }
+            }
+            else
+            {
+                AiResearchReceiptText.Text = "Research mode skipped";
+            }
             _aiConversation.Add(new AiMessage("user", prompt));
+            var messages = BuildAiMessages(model, context);
+            var estimatedInputTokens = Math.Max(1, messages.Sum(message => message.Content.Length) / 4);
+            var contextStrategy = AiAxlContextToggle.IsOn && _lastHealth?.PluginConnected == true ? "task-aware AXL" : "selected context";
+            AiContextSizeText.Text = $"~{estimatedInputTokens:N0} input tokens • {contextStrategy} • {model.Name}";
             AiTranscriptTextBox.Text += $"{Environment.NewLine}{Environment.NewLine}You:{Environment.NewLine}{prompt}{Environment.NewLine}{Environment.NewLine}Ollama ({model.Name}):{Environment.NewLine}";
             AiPromptTextBox.Text = string.Empty;
-            var messages = new[] { new AiMessage("system", context) }.Concat(_aiConversation).ToArray();
             var response = new StringBuilder();
             await foreach (var chunk in _aiProvider.StreamChatAsync(model.Name, messages, _aiCancellation.Token))
             {
@@ -708,8 +736,10 @@ public sealed partial class MainWindow : Window
     {
         try
         {
-            var context = await BuildAiContextAsync();
-            AiContextSizeText.Text = $"{context.Length:N0} context characters";
+            var task = AiPromptTextBox.Text.Trim();
+            if (task.Length == 0) task = _aiConversation.LastOrDefault(message => message.Role == "user")?.Content ?? "Summarize the open Studio place";
+            var context = await BuildAiContextAsync(task, AiModelPicker.SelectedItem as AiModel);
+            AiContextSizeText.Text = $"~{Math.Max(1, context.Length / 4):N0} context tokens before conversation";
             var dialog = new ContentDialog { XamlRoot = (Content as FrameworkElement)?.XamlRoot, Title = "Context preview", Content = new TextBox { Text = context, IsReadOnly = true, AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Consolas"), MinWidth = 620, MaxHeight = 520 }, CloseButtonText = "Close" };
             await dialog.ShowAsync();
         }
@@ -723,40 +753,301 @@ public sealed partial class MainWindow : Window
         SaveAiProjectState();
     }
 
-    private async Task<string> BuildAiContextAsync()
+    private async Task<string> BuildAiContextAsync(string? task = null, AiModel? model = null)
     {
         var context = new StringBuilder();
-        context.AppendLine("You are the read-only Abraxius Roblox Studio assistant. Provide concise, evidence-based Luau and Studio guidance. Do not claim to execute commands or change Studio. Suggest explicit previews and verification before mutations.");
-        if (!string.IsNullOrWhiteSpace(AiProjectInstructionsTextBox.Text)) context.AppendLine($"\nPROJECT INSTRUCTIONS:\n{AiProjectInstructionsTextBox.Text.Trim()}");
+        context.AppendLine("You are Abraxius Studio Copilot. Answer concisely from the supplied evidence. Distinguish verified facts from inference. You are read-only: never claim you executed or changed Studio. When research evidence is supplied, cite its Studio paths and line ranges. When more evidence is needed, propose the smallest exact AXL find/read command. For changes, explain the intended edit and require user approval.");
+        if (!string.IsNullOrWhiteSpace(AiProjectInstructionsTextBox.Text)) context.AppendLine($"\nPROJECT INSTRUCTIONS:\n{LimitContext(AiProjectInstructionsTextBox.Text.Trim(), 4000)}");
         if (_aiMemories.Count > 0)
         {
-            context.AppendLine("\nLONG-TERM PROJECT MEMORY:");
-            foreach (var memory in _aiMemories) context.AppendLine($"- {memory.Text}");
+            var memory = string.Join("\n", _aiMemories.Select(item => $"- {item.Text}"));
+            context.AppendLine("\nLONG-TERM PROJECT MEMORY:\n" + LimitContext(memory, 6000));
         }
         context.AppendLine($"Abraxius host: {(_lastHealth?.Running == true ? "running" : "unavailable")}; companion: {(_lastHealth?.PluginConnected == true ? "connected" : "offline")}; tools: {_lastHealth?.ToolsLoaded ?? 0}.");
+        if (AiAxlContextToggle.IsOn && _lastHealth?.PluginConnected == true && !string.IsNullOrWhiteSpace(task))
+        {
+            try
+            {
+                var requestedBudget = double.IsNaN(AiAxlBudgetBox.Value) ? 1200 : AiAxlBudgetBox.Value;
+                var budget = Math.Clamp((int)requestedBudget, 256, 8000);
+                var result = await CallPluginAsync(new Dictionary<string, object?>
+                {
+                    ["type"] = "axl",
+                    ["source"] = $"context {QuoteAxl(task)} budget={budget}"
+                });
+                var response = FindJsonString(result, "response");
+                if (!string.IsNullOrWhiteSpace(response)) context.AppendLine("\nTASK-AWARE AXL CONTEXT:\n" + response);
+                else context.AppendLine("\nTASK-AWARE AXL CONTEXT UNAVAILABLE: companion returned no response.");
+            }
+            catch (Exception exception) { context.AppendLine($"\nTASK-AWARE AXL CONTEXT UNAVAILABLE: {exception.Message}"); }
+        }
         if (AiStudioContextToggle.IsOn && _lastHealth?.PluginConnected == true)
         {
             try
             {
                 var studio = await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "get_assistant_context" });
-                context.AppendLine("\nSTUDIO CONTEXT:\n" + LimitContext(JsonSerializer.Serialize(studio, new JsonSerializerOptions { WriteIndented = true }), 24000));
+                context.AppendLine("\nFULL STUDIO SNAPSHOT (SUPPLEMENTAL):\n" + LimitContext(JsonSerializer.Serialize(studio, new JsonSerializerOptions { WriteIndented = true }), 12000));
             }
             catch (Exception exception) { context.AppendLine($"\nSTUDIO CONTEXT UNAVAILABLE: {exception.Message}"); }
         }
         if (AiEditorContextToggle.IsOn && _editorReady && _editorLoadedPath is not null)
         {
             var source = await GetEditorValueAsync();
-            context.AppendLine($"\nACTIVE EDITOR: {_editorLoadedPath}\n```luau\n{LimitContext(source, 24000)}\n```");
+            context.AppendLine($"\nUNSAVED ACTIVE EDITOR: {_editorLoadedPath}\n```luau\n{LimitContext(source, 16000)}\n```");
         }
         if (AiRuntimeContextToggle.IsOn)
         {
-            context.AppendLine("\nRECENT RUNTIME OUTPUT:");
-            foreach (var item in _latestOutput.Take(20)) context.AppendLine($"[{item.LevelLabel}] {item.Message} ({item.Location})");
+            context.AppendLine("\nRECENT RUNTIME ERRORS AND WARNINGS:");
+            var importantOutput = _latestOutput.Where(item =>
+                item.LevelLabel.Contains("error", StringComparison.OrdinalIgnoreCase)
+                || item.LevelLabel.Contains("warn", StringComparison.OrdinalIgnoreCase)).Take(12);
+            foreach (var item in importantOutput) context.AppendLine($"[{item.LevelLabel}] {item.Message} ({item.Location})");
         }
-        return LimitContext(context.ToString(), 52000);
+        return LimitContext(context.ToString(), AiContextMaximumCharacters(model));
     }
 
     private static string LimitContext(string value, int maximum) => value.Length <= maximum ? value : value[..maximum] + "\n[context truncated]";
+
+    private static int AiContextMaximumCharacters(AiModel? model)
+    {
+        var modelTokens = model?.ContextLength > 0 ? model.ContextLength : 8192;
+        return (int)Math.Clamp((modelTokens - 2200) * 4, 12000, 52000);
+    }
+
+    private static string QuoteAxl(string value) => "\"" + value
+        .Replace("\\", "\\\\", StringComparison.Ordinal)
+        .Replace("\"", "\\\"", StringComparison.Ordinal)
+        .Replace("\r", "\\r", StringComparison.Ordinal)
+        .Replace("\n", "\\n", StringComparison.Ordinal)
+        .Replace("\t", "\\t", StringComparison.Ordinal) + "\"";
+
+    private IReadOnlyList<AiMessage> BuildAiMessages(AiModel model, string context)
+    {
+        var modelTokens = model.ContextLength > 0 ? model.ContextLength : 8192;
+        var historyCharacterBudget = Math.Max(2000, (int)((modelTokens - 1600) * 4 - context.Length));
+        var recent = new List<AiMessage>();
+        var used = 0;
+        for (var index = _aiConversation.Count - 1; index >= 0; index--)
+        {
+            var message = _aiConversation[index];
+            if (recent.Count > 0 && used + message.Content.Length > historyCharacterBudget) break;
+            recent.Add(message);
+            used += message.Content.Length;
+        }
+        recent.Reverse();
+        return new[] { new AiMessage("system", context) }.Concat(recent).ToArray();
+    }
+
+    private async Task<AiResearchResult> RunAiResearchAsync(
+        AiModel model,
+        string task,
+        string initialContext,
+        CancellationToken cancellationToken)
+    {
+        const int maximumRounds = 2;
+        const int maximumCalls = 6;
+        const int maximumEvidenceCharacters = 8000;
+        var evidence = new StringBuilder();
+        var seenCommands = new HashSet<string>(StringComparer.Ordinal);
+        var executedLabels = new List<string>();
+        var rounds = 0;
+
+        try
+        {
+            for (var round = 1; round <= maximumRounds && executedLabels.Count < maximumCalls; round++)
+            {
+                rounds = round;
+                var plannerMessages = new[]
+                {
+                    new AiMessage(
+                        "system",
+                        """
+                        You are the read-only research planner for Abraxius Studio Copilot.
+                        Request only the smallest evidence needed to answer the task.
+                        Available operations are find, symbols, lines, and state.
+                        Never request source/full reads, patch, execute, undo, or any mutation.
+                        AXL find is a literal source search: use one short identifier or term such as
+                        SaveInventory, inventory, or EndRound, never a sentence or the user's question.
+                        Prefer symbols before lines and stop when the current evidence is sufficient.
+                        """),
+                    new AiMessage(
+                        "user",
+                        $"TASK:\n{task}\n\nCURRENT CONTEXT:\n{LimitContext(initialContext, 10000)}"
+                        + $"\n\nEVIDENCE SO FAR:\n{(evidence.Length == 0 ? "None." : evidence.ToString())}"
+                        + $"\n\nLIMITS:\nRound {round}/{maximumRounds}; {maximumCalls - executedLabels.Count} calls remain; "
+                        + $"{Math.Max(0, maximumEvidenceCharacters - evidence.Length) / 4} evidence tokens remain.")
+                };
+
+                var planJson = await _aiProvider.CompleteStructuredAsync(
+                    model.Name,
+                    plannerMessages,
+                    AiResearchPlanSchema(),
+                    cancellationToken);
+                using var plan = JsonDocument.Parse(planJson);
+                var root = plan.RootElement;
+                if (root.TryGetProperty("done", out var done) && done.ValueKind == JsonValueKind.True) break;
+                if (!root.TryGetProperty("commands", out var commands) || commands.ValueKind != JsonValueKind.Array) break;
+
+                var callsThisRound = 0;
+                foreach (var proposed in commands.EnumerateArray())
+                {
+                    if (executedLabels.Count >= maximumCalls || callsThisRound >= 3 || evidence.Length >= maximumEvidenceCharacters) break;
+                    if (!TryBuildReadOnlyResearchCommand(proposed, out var source, out var label)) continue;
+                    if (!seenCommands.Add(source)) continue;
+
+                    var result = await CallPluginAsync(new Dictionary<string, object?>
+                    {
+                        ["type"] = "axl",
+                        ["source"] = source
+                    });
+                    var response = FindJsonString(result, "response") ?? "ERR RESPONSE Companion returned no AXL response.";
+                    var header = $"\n[AXL {label}]\n";
+                    var remaining = maximumEvidenceCharacters - evidence.Length - header.Length;
+                    if (remaining <= 0) break;
+                    evidence.Append(header).Append(LimitContext(response, remaining));
+                    executedLabels.Add(label);
+                    callsThisRound++;
+                }
+                if (callsThisRound == 0) break;
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            var partial = executedLabels.Count == 0 ? string.Empty : evidence.ToString().Trim();
+            return new AiResearchResult(
+                partial,
+                $"Research unavailable • {RedactSensitiveText(exception.Message)}");
+        }
+
+        var estimatedTokens = Math.Max(0, evidence.Length / 4);
+        var receipt = executedLabels.Count == 0
+            ? "Research complete • no extra reads needed"
+            : $"Research complete • {executedLabels.Count}/{maximumCalls} reads • ~{estimatedTokens:N0}/2,000 evidence tokens • {rounds} round{(rounds == 1 ? string.Empty : "s")}";
+        if (executedLabels.Count > 0)
+        {
+            receipt += "\n" + string.Join(" → ", executedLabels.Take(4))
+                + (executedLabels.Count > 4 ? $" → +{executedLabels.Count - 4} more" : string.Empty);
+        }
+        return new AiResearchResult(evidence.ToString().Trim(), receipt);
+    }
+
+    private static JsonElement AiResearchPlanSchema()
+    {
+        using var document = JsonDocument.Parse("""
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "done": { "type": "boolean" },
+            "reason": { "type": "string" },
+            "commands": {
+              "type": "array",
+              "maxItems": 3,
+              "items": {
+                "type": "object",
+                "additionalProperties": false,
+                "properties": {
+                  "type": { "type": "string", "enum": ["find", "symbols", "lines", "state"] },
+                  "query": { "type": "string", "maxLength": 64 },
+                  "path": { "type": "string" },
+                  "start": { "type": "integer", "minimum": 1 },
+                  "end": { "type": "integer", "minimum": 1 },
+                  "budget": { "type": "integer", "minimum": 64, "maximum": 500 }
+                },
+                "required": ["type"]
+              }
+            }
+          },
+          "required": ["done", "commands"]
+        }
+        """);
+        return document.RootElement.Clone();
+    }
+
+    private static bool TryBuildReadOnlyResearchCommand(JsonElement proposed, out string source, out string label)
+    {
+        source = string.Empty;
+        label = string.Empty;
+        if (proposed.ValueKind != JsonValueKind.Object
+            || !proposed.TryGetProperty("type", out var typeValue)
+            || typeValue.GetString() is not string type)
+        {
+            return false;
+        }
+
+        switch (type)
+        {
+            case "find":
+            {
+                var query = proposed.TryGetProperty("query", out var queryValue) ? queryValue.GetString()?.Trim() : null;
+                if (string.IsNullOrWhiteSpace(query)
+                    || query.Length > 64
+                    || query.Any(character => char.IsControl(character))
+                    || query.Count(char.IsWhiteSpace) > 2)
+                {
+                    return false;
+                }
+                var budget = proposed.TryGetProperty("budget", out var budgetValue) && budgetValue.TryGetInt32(out var requestedBudget)
+                    ? Math.Clamp(requestedBudget, 64, 500)
+                    : 300;
+                source = $"find {QuoteAxl(query)} budget={budget}";
+                label = $"find {query}";
+                return true;
+            }
+            case "symbols":
+            {
+                var path = proposed.TryGetProperty("path", out var pathValue) ? pathValue.GetString()?.Trim() : null;
+                if (!IsSafeResearchPath(path)) return false;
+                source = $"read {path} symbols";
+                label = $"symbols {path}";
+                return true;
+            }
+            case "lines":
+            {
+                var path = proposed.TryGetProperty("path", out var pathValue) ? pathValue.GetString()?.Trim() : null;
+                if (!IsSafeResearchPath(path)
+                    || !proposed.TryGetProperty("start", out var startValue)
+                    || !startValue.TryGetInt32(out var start)
+                    || !proposed.TryGetProperty("end", out var endValue)
+                    || !endValue.TryGetInt32(out var end)
+                    || start < 1
+                    || end < start)
+                {
+                    return false;
+                }
+                end = Math.Min(end, start + 119);
+                source = $"read {path} lines {start}..{end}";
+                label = $"lines {path}:{start}-{end}";
+                return true;
+            }
+            case "state":
+            {
+                var path = proposed.TryGetProperty("path", out var pathValue) ? pathValue.GetString()?.Trim() : null;
+                if (string.IsNullOrWhiteSpace(path))
+                {
+                    source = "state";
+                    label = "state";
+                    return true;
+                }
+                if (!IsSafeResearchPath(path)) return false;
+                source = $"state {path}";
+                label = $"state {path}";
+                return true;
+            }
+            default:
+                return false;
+        }
+    }
+
+    private static bool IsSafeResearchPath(string? path)
+    {
+        if (string.IsNullOrWhiteSpace(path) || path.Length > 1024 || "@#$%^\"'\\".Any(path.Contains)) return false;
+        return path.All(character => !char.IsWhiteSpace(character) && !char.IsControl(character));
+    }
 
     private async Task ResolveAiProjectAsync()
     {
@@ -899,7 +1190,7 @@ public sealed partial class MainWindow : Window
             var messages = new[]
             {
                 new AiMessage("system", "You draft Abraxius companion commands but never execute them. Return JSON only: {\"summary\":\"...\",\"commands\":[{\"type\":\"command_name\",\"arguments\":{}}]}. Use only provided schemas. Prefer read/inspect commands before mutations. Include required confirm fields. At most 20 commands."),
-                new AiMessage("user", $"TASK:\n{intention}\n\nAVAILABLE COMMAND SCHEMAS:\n{LimitContext(schemaCatalog, 26000)}\n\nPROJECT CONTEXT:\n{LimitContext(await BuildAiContextAsync(), 18000)}")
+                new AiMessage("user", $"TASK:\n{intention}\n\nAVAILABLE COMMAND SCHEMAS:\n{LimitContext(schemaCatalog, 18000)}\n\nPROJECT CONTEXT:\n{LimitContext(await BuildAiContextAsync(intention, model), 14000)}")
             };
             using var cancellation = new CancellationTokenSource(TimeSpan.FromMinutes(4));
             var response = await CollectAiResponseAsync(model.Name, messages, cancellation.Token);
@@ -939,7 +1230,7 @@ public sealed partial class MainWindow : Window
         if (AiModelPicker.SelectedItem is not AiModel model || model.IsRemote && AiLocalModelsOnlyToggle.IsOn) return;
         try
         {
-            var context = await BuildAiContextAsync();
+            var context = await BuildAiContextAsync("Create a concise project handoff from the current Studio work", model);
             var messages = new[]
             {
                 new AiMessage("system", "Create a compact handoff briefing for another coding agent. Use concise Markdown. Preserve verified architecture, active work, important Studio paths, errors, constraints, decisions, and next actions. Clearly label uncertainty. Do not include greetings."),
@@ -1303,33 +1594,336 @@ public sealed partial class MainWindow : Window
         {
             var preview = await PreviewEditorChangesAsync();
             EditorDiffTextBox.Text = JsonSerializer.Serialize(preview, new JsonSerializerOptions { WriteIndented = true });
-            var dialog = new ContentDialog { XamlRoot = (Content as FrameworkElement)?.XamlRoot, Title = "Push source to Studio?", Content = $"Review the dry-run preview for {_editorLoadedPath}. The commit will use conflict detection and read the source back.", PrimaryButtonText = "Push source", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
-            if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
-            var source = await GetEditorValueAsync();
-            await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "write_source", ["path"] = _editorLoadedPath, ["source"] = source, ["expectedHash"] = _editorSourceHash, ["dryRun"] = false });
-            var verification = await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "read_source", ["path"] = _editorLoadedPath });
-            var verifiedSource = FindJsonString(verification, "source") ?? throw new InvalidOperationException("Read-back did not return source.");
-            if (!string.Equals(source, verifiedSource, StringComparison.Ordinal)) throw new InvalidOperationException("Studio read-back did not match the committed editor source.");
-            _editorSourceHash = FindJsonString(verification, "hash") ?? FindJsonString(verification, "sourceHash");
-            EditorHashText.Text = $"Source hash  {_editorSourceHash ?? "unavailable"}";
-            if (_editorDocuments.TryGetValue(_editorLoadedPath, out var document))
+            EditorInfoBar.Severity = InfoBarSeverity.Success;
+            EditorInfoBar.Title = "Change staged for review";
+            EditorInfoBar.Message = "Studio was not changed. Approve the exact preview in Change Review.";
+            _dismissedReviewKeys.Remove($"editor:{_editorLoadedPath}");
+            await RefreshChangeReviewAsync();
+            CategoryNavigation.SelectedItem = ReviewNavigationItem;
+        }
+        catch (Exception exception) { SetEditorError("Could not stage source review", exception); }
+    }
+
+    private async void RefreshChangeReviewButton_Click(object sender, RoutedEventArgs e)
+    {
+        _dismissedReviewKeys.Clear();
+        await RefreshChangeReviewAsync();
+    }
+
+    private async Task RefreshChangeReviewAsync()
+    {
+        if (_editorReady && _editorLoadedPath is not null && _editorDocuments.TryGetValue(_editorLoadedPath, out var active))
+        {
+            active.Source = await GetEditorValueAsync();
+            active.Dirty = _editorDirty;
+        }
+
+        _changeReviewItems.Clear();
+        foreach (var document in _editorDocuments.Values.Where(item => item.Dirty))
+        {
+            var key = $"editor:{document.Path}";
+            if (_dismissedReviewKeys.Contains(key)) continue;
+            var risk = EstimateSourceRisk(document.Path, document.Source);
+            _changeReviewItems.Add(new ChangeReviewRow(key, "Editor", ScriptName(document.Path), document.Path, risk,
+                "Replace this script with the reviewed editor buffer using optimistic hash conflict detection.",
+                "Awaiting a live Studio dry-run preview.", document.Source, document.Hash, null));
+        }
+        foreach (var item in _approvalQueueItems)
+        {
+            var key = $"command:{item.Position}:{item.Command}:{item.Arguments.GetRawText()}";
+            if (_dismissedReviewKeys.Contains(key)) continue;
+            _changeReviewItems.Add(new ChangeReviewRow(key, "Command", item.Command, CommandTarget(item), EstimateCommandRisk(item.Command, item.Arguments),
+                DescribeCommand(item.Command, item.Arguments), "Arguments parsed as a JSON object · explicit approval required.",
+                item.Arguments.GetRawText(), null, item));
+        }
+
+        ReviewLowRiskText.Text = $"{_changeReviewItems.Count(item => item.Risk == "Low")} low";
+        ReviewMediumRiskText.Text = $"{_changeReviewItems.Count(item => item.Risk == "Medium")} medium";
+        ReviewHighRiskText.Text = $"{_changeReviewItems.Count(item => item.Risk == "High")} high";
+        ReviewInfoBar.Severity = _changeReviewItems.Count == 0 ? InfoBarSeverity.Informational : InfoBarSeverity.Warning;
+        ReviewInfoBar.Title = _changeReviewItems.Count == 0 ? "No changes staged" : $"{_changeReviewItems.Count} changes require review";
+        ReviewInfoBar.Message = _changeReviewItems.Count == 0
+            ? "Dirty editor buffers and queued commands appear here automatically."
+            : "Select an item to run its read-only preflight and inspect the exact payload.";
+        ApplyReviewedChangeButton.IsEnabled = false;
+        if (_changeReviewItems.Count > 0) ChangeReviewList.SelectedIndex = 0;
+        else ResetChangeReviewDetails();
+    }
+
+    private async void ChangeReviewList_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (ChangeReviewList.SelectedItem is not ChangeReviewRow item)
+        {
+            ResetChangeReviewDetails();
+            return;
+        }
+        ReviewDetailTitle.Text = item.Title;
+        ReviewDetailTarget.Text = $"{item.Kind} · {item.Target}";
+        ReviewDetailRisk.Text = $"{item.Risk} risk";
+        ReviewExplanationText.Text = item.Summary;
+        ReviewValidationText.Text = item.Validation;
+        ApplyReviewedChangeButton.IsEnabled = false;
+        try
+        {
+            if (item.Kind == "Editor")
             {
-                document.Source = source;
-                document.Hash = _editorSourceHash;
+                var preview = await CallPluginAsync(new Dictionary<string, object?>
+                {
+                    ["type"] = "write_source",
+                    ["path"] = item.Target,
+                    ["source"] = item.Payload,
+                    ["expectedHash"] = item.ExpectedHash,
+                    ["dryRun"] = true
+                });
+                if (ChangeReviewList.SelectedItem is not ChangeReviewRow selected || selected.Key != item.Key) return;
+                ReviewDiffTextBox.Text = JsonSerializer.Serialize(preview, new JsonSerializerOptions { WriteIndented = true });
+                var diff = FindJsonArray(preview, "diff");
+                var blocks = diff?.GetArrayLength() ?? 0;
+                ReviewValidationText.Text = $"Studio dry-run passed · source hash attached · {blocks} changed line block{(blocks == 1 ? string.Empty : "s")} · Studio unchanged";
+            }
+            else
+            {
+                using var parsed = JsonDocument.Parse(item.Payload);
+                ReviewDiffTextBox.Text = JsonSerializer.Serialize(parsed.RootElement, new JsonSerializerOptions { WriteIndented = true });
+                ReviewValidationText.Text = item.Validation;
+            }
+            ApplyReviewedChangeButton.IsEnabled = true;
+        }
+        catch (Exception exception)
+        {
+            ReviewDiffTextBox.Text = exception.Message;
+            ReviewValidationText.Text = "Preflight failed. Resolve the conflict or connection problem before applying.";
+            ReviewInfoBar.Severity = InfoBarSeverity.Error;
+            ReviewInfoBar.Title = "Review preflight failed";
+            ReviewInfoBar.Message = exception.Message;
+        }
+    }
+
+    private void ResetChangeReviewDetails()
+    {
+        ReviewDetailTitle.Text = "Select a staged change";
+        ReviewDetailTarget.Text = "No target selected";
+        ReviewDetailRisk.Text = "Risk --";
+        ReviewExplanationText.Text = "Choose an item to inspect its intended operation.";
+        ReviewValidationText.Text = "No validation has run.";
+        ReviewDiffTextBox.Text = "Select a change to inspect it.";
+        ApplyReviewedChangeButton.IsEnabled = false;
+    }
+
+    private async void ApplyReviewedChangeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ChangeReviewList.SelectedItem is not ChangeReviewRow item) return;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = (Content as FrameworkElement)?.XamlRoot,
+            Title = $"Apply {item.Risk.ToLowerInvariant()}-risk change?",
+            Content = $"{item.Target}\n\n{item.Summary}",
+            PrimaryButtonText = "Apply change",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close
+        };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        ApplyReviewedChangeButton.IsEnabled = false;
+        try
+        {
+            if (item.Kind == "Editor") await ApplyEditorReviewAsync(item);
+            else if (item.Command is not null) await ApplyCommandReviewAsync(item.Command);
+            _dismissedReviewKeys.Remove(item.Key);
+            ReviewInfoBar.Severity = InfoBarSeverity.Success;
+            ReviewInfoBar.Title = "Change applied";
+            ReviewInfoBar.Message = item.Target;
+            await RefreshChangeReviewAsync();
+        }
+        catch (Exception exception)
+        {
+            ReviewInfoBar.Severity = InfoBarSeverity.Error;
+            ReviewInfoBar.Title = "Change was not applied";
+            ReviewInfoBar.Message = exception.Message;
+            ApplyReviewedChangeButton.IsEnabled = true;
+        }
+    }
+
+    private async Task ApplyEditorReviewAsync(ChangeReviewRow item)
+    {
+        var before = await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "read_source", ["path"] = item.Target });
+        var beforeSource = FindJsonString(before, "source") ?? throw new InvalidOperationException("Studio did not return the current source.");
+        var commit = await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "write_source", ["path"] = item.Target, ["source"] = item.Payload, ["expectedHash"] = item.ExpectedHash, ["dryRun"] = false });
+        var committedHash = FindJsonString(commit, "hash") ?? FindJsonString(commit, "sourceHash");
+        _lastEditorRollback = new EditorRollback(item.Target, beforeSource, committedHash);
+        RollbackLastChangeButton.IsEnabled = committedHash is not null;
+        var verification = await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "read_source", ["path"] = item.Target });
+        var verifiedSource = FindJsonString(verification, "source") ?? throw new InvalidOperationException("Studio read-back did not return source.");
+        if (!string.Equals(item.Payload, verifiedSource, StringComparison.Ordinal)) throw new InvalidOperationException("Studio read-back did not match the approved source.");
+        var appliedHash = FindJsonString(verification, "hash") ?? FindJsonString(verification, "sourceHash");
+        _lastEditorRollback = new EditorRollback(item.Target, beforeSource, appliedHash ?? committedHash);
+        RollbackLastChangeButton.IsEnabled = _lastEditorRollback.AppliedHash is not null;
+        if (_editorDocuments.TryGetValue(item.Target, out var document))
+        {
+            document.Source = item.Payload;
+            document.Hash = appliedHash;
+            document.Dirty = false;
+            UpdateEditorTabHeader(document);
+        }
+        if (_editorLoadedPath == item.Target)
+        {
+            _editorSourceHash = appliedHash;
+            EditorHashText.Text = $"Source hash  {appliedHash ?? "unavailable"}";
+            SetEditorDirty(false);
+        }
+    }
+
+    private async Task ApplyCommandReviewAsync(ApprovalQueueRow command)
+    {
+        await CallCommandAsync(command.Command, command.Arguments);
+        AddCommandHistory(command.Command, "Completed after Change Review approval");
+        _approvalQueueItems.Remove(command);
+        for (var index = 0; index < _approvalQueueItems.Count; index++)
+            _approvalQueueItems[index] = _approvalQueueItems[index] with { Position = (index + 1).ToString() };
+        ExecuteApprovalQueueButton.IsEnabled = _approvalQueueItems.Count > 0;
+    }
+
+    private void DismissReviewItemButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (ChangeReviewList.SelectedItem is not ChangeReviewRow item) return;
+        _dismissedReviewKeys.Add(item.Key);
+        _changeReviewItems.Remove(item);
+        ReviewInfoBar.Severity = InfoBarSeverity.Informational;
+        ReviewInfoBar.Title = "Review dismissed";
+        ReviewInfoBar.Message = item.Kind == "Editor"
+            ? "The local editor buffer is unchanged. Refresh to bring it back."
+            : "The command remains in the approval queue. Refresh to bring it back.";
+        ResetChangeReviewDetails();
+    }
+
+    private async void RollbackLastChangeButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (_lastEditorRollback is not EditorRollback rollback) return;
+        var dialog = new ContentDialog { XamlRoot = (Content as FrameworkElement)?.XamlRoot, Title = "Rollback last source apply?", Content = rollback.Path, PrimaryButtonText = "Restore previous source", CloseButtonText = "Cancel", DefaultButton = ContentDialogButton.Close };
+        if (await dialog.ShowAsync() != ContentDialogResult.Primary) return;
+        try
+        {
+            await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "write_source", ["path"] = rollback.Path, ["source"] = rollback.BeforeSource, ["expectedHash"] = rollback.AppliedHash, ["dryRun"] = false });
+            var verification = await CallPluginAsync(new Dictionary<string, object?> { ["type"] = "read_source", ["path"] = rollback.Path });
+            var source = FindJsonString(verification, "source");
+            if (!string.Equals(source, rollback.BeforeSource, StringComparison.Ordinal)) throw new InvalidOperationException("Rollback read-back did not match the previous source.");
+            var hash = FindJsonString(verification, "hash") ?? FindJsonString(verification, "sourceHash");
+            if (_editorDocuments.TryGetValue(rollback.Path, out var document))
+            {
+                document.Source = rollback.BeforeSource;
+                document.Hash = hash;
                 document.Dirty = false;
                 UpdateEditorTabHeader(document);
             }
-            SetEditorDirty(false);
-            EditorInfoBar.Severity = InfoBarSeverity.Success;
-            EditorInfoBar.Title = "Source pushed and verified";
-            EditorInfoBar.Message = _editorLoadedPath;
+            if (_editorLoadedPath == rollback.Path)
+            {
+                await SetEditorValueAsync(rollback.BeforeSource);
+                _editorSourceHash = hash;
+                EditorHashText.Text = $"Source hash  {hash ?? "unavailable"}";
+                SetEditorDirty(false);
+            }
+            _lastEditorRollback = null;
+            RollbackLastChangeButton.IsEnabled = false;
+            ReviewInfoBar.Severity = InfoBarSeverity.Success;
+            ReviewInfoBar.Title = "Previous source restored";
+            ReviewInfoBar.Message = rollback.Path;
+            await RefreshChangeReviewAsync();
         }
-        catch (Exception exception) { SetEditorError("Could not push source", exception); }
+        catch (Exception exception)
+        {
+            ReviewInfoBar.Severity = InfoBarSeverity.Error;
+            ReviewInfoBar.Title = "Rollback failed safely";
+            ReviewInfoBar.Message = exception.Message;
+        }
+    }
+
+    private static string EstimateSourceRisk(string path, string source)
+    {
+        var sensitive = new[] { "DataStoreService", "HttpService", "TeleportService", "MessagingService", "MemoryStoreService", "while true", "loadstring" };
+        if (sensitive.Any(token => source.Contains(token, StringComparison.OrdinalIgnoreCase))) return "High";
+        if (path.Contains("ServerScriptService", StringComparison.OrdinalIgnoreCase) || source.Count(character => character == '\n') > 80) return "Medium";
+        return "Low";
+    }
+
+    private static string? AxlVerb(JsonElement arguments)
+    {
+        if (arguments.ValueKind != JsonValueKind.Object
+            || !arguments.TryGetProperty("source", out var sourceValue)
+            || sourceValue.ValueKind != JsonValueKind.String)
+            return null;
+        var source = sourceValue.GetString()?.TrimStart();
+        if (string.IsNullOrEmpty(source)) return null;
+        var separator = source.IndexOfAny(new[] { ' ', '\t', '\r', '\n' });
+        return (separator < 0 ? source : source[..separator]).ToLowerInvariant();
+    }
+
+    private static string EstimateCommandRisk(string command, JsonElement? arguments = null)
+    {
+        if (command == "axl")
+        {
+            var verb = arguments.HasValue ? AxlVerb(arguments.Value) : null;
+            return verb switch
+            {
+                "hello" or "context" or "find" or "read" or "state" => "Low",
+                _ => "High"
+            };
+        }
+        return command switch
+        {
+            "delete_instance" or "execute_luau" or "write_source" or "create_script" or "multi_edit" => "High",
+            "set_properties" or "clone_instance" or "rename_instance" or "reparent_instance" or "transform_instance" or "create_instance" or "batch" => "Medium",
+            _ => "Low"
+        };
+    }
+
+    private static string CommandTarget(ApprovalQueueRow item)
+    {
+        if (item.Command == "axl")
+        {
+            var verb = AxlVerb(item.Arguments);
+            return verb is null ? "AXL command" : $"AXL {verb}";
+        }
+        foreach (var name in new[] { "file_path", "path", "parent", "name" })
+            if (item.Arguments.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String) return value.GetString() ?? item.Command;
+        return "Studio command";
+    }
+
+    private static string DescribeCommand(string command, JsonElement? arguments = null)
+    {
+        if (command == "axl")
+        {
+            var verb = arguments.HasValue ? AxlVerb(arguments.Value) : null;
+            return verb switch
+            {
+                "hello" => "Negotiate the compact AXL protocol without changing Studio.",
+                "context" => "Gather a token-budgeted live Studio snapshot and task-relevant script evidence.",
+                "find" => "Search live Studio scripts and return complete, budget-packed matches.",
+                "read" => "Read live script metadata or source without changing Studio.",
+                "state" => "Inspect live Studio or instance state without changing it.",
+                "patch" => "Apply one exact, revision-checked source replacement in Studio.",
+                "execute" => "Execute approved Luau in Studio Edit mode through AXL.",
+                "undo" => "Request AXL operation-owned undo. This protocol version rejects it safely.",
+                null => "Run an unclassified AXL payload. Treat it as high risk until its verb is known.",
+                _ => $"Run the unrecognized AXL verb '{verb}'. It is treated as high risk."
+            };
+        }
+        return command switch
+        {
+            "multi_edit" => "Apply exact, ordered source replacements through Studio MCP.",
+            "write_source" => "Replace a script source through the Studio companion.",
+            "create_script" => "Create a Script, LocalScript, or ModuleScript. Provide a full path, or a parent and name.",
+            "read_source" => "Read a script without changing Studio.",
+            "get_selection" => "Show the instances currently selected in Studio.",
+            "get_properties" => "Read only the requested properties from an instance.",
+            "delete_instance" => "Delete the selected Studio instance with undo history.",
+            "execute_luau" => "Execute approved Luau in Studio Edit mode.",
+            "set_properties" => "Change one or more properties on a Studio instance.",
+            _ => $"Run the queued '{command}' Studio operation."
+        };
     }
 
     private async Task<JsonElement> CallPluginAsync(Dictionary<string, object?> command)
     {
-        using var response = await _http.PostAsJsonAsync("plugin/call", new { command });
+        using var response = await _studioHttp.PostAsJsonAsync("plugin/call", new { command });
         var json = await response.Content.ReadAsStringAsync();
         response.EnsureSuccessStatusCode();
         using var document = JsonDocument.Parse(json);
@@ -1343,7 +1937,7 @@ public sealed partial class MainWindow : Window
             var mcpArguments = new Dictionary<string, object?>();
             foreach (var property in arguments.EnumerateObject()) mcpArguments[property.Name] = property.Value.Clone();
             mcpArguments["datamodel_type"] = "Edit";
-            using var response = await _http.PostAsJsonAsync("call", new { name = commandName, arguments = mcpArguments });
+            using var response = await _studioHttp.PostAsJsonAsync("call", new { name = commandName, arguments = mcpArguments });
             var json = await response.Content.ReadAsStringAsync();
             response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(json);
@@ -1547,7 +2141,7 @@ public sealed partial class MainWindow : Window
         CommandPicker.IsEnabled = false;
         try
         {
-            using var response = await _http.PostAsJsonAsync("plugin/call", new { command = new { type = "get_capabilities" } });
+            using var response = await _studioHttp.PostAsJsonAsync("plugin/call", new { command = new { type = "get_capabilities" } });
             var json = await response.Content.ReadAsStringAsync();
             response.EnsureSuccessStatusCode();
             using var document = JsonDocument.Parse(json);
@@ -1569,8 +2163,9 @@ public sealed partial class MainWindow : Window
             _commandCatalogLoaded = names.Length > 0;
             CommandInfoBar.Severity = InfoBarSeverity.Success;
             CommandInfoBar.Title = $"{names.Length} commands available";
-            CommandInfoBar.Message = "Select a command, review its schema, and supply a JSON argument object.";
-            if (names.Length > 0 && CommandPicker.SelectedIndex < 0) CommandPicker.SelectedIndex = 0;
+            CommandInfoBar.Message = "Choose a common task or browse the full catalog.";
+            if (CommandPicker.SelectedIndex < 0 && names.Contains("get_selection")) CommandPicker.SelectedItem = "get_selection";
+            else if (names.Length > 0 && CommandPicker.SelectedIndex < 0) CommandPicker.SelectedIndex = 0;
         }
         catch (Exception exception)
         {
@@ -1628,10 +2223,15 @@ public sealed partial class MainWindow : Window
     private void CommandPicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         var command = CommandPicker.SelectedItem?.ToString();
-        RunCommandButton.IsEnabled = command is not null;
+        var mutating = command is not null && IsMutatingCommand(command);
+        RunCommandButton.IsEnabled = command is not null && !mutating;
         QueueCommandButton.IsEnabled = command is not null;
         FavoriteCommandButton.IsEnabled = command is not null;
         FavoriteCommandButton.Content = command is not null && _favoriteCommands.Contains(command) ? "★ Favorite" : "☆ Favorite";
+        CommandFriendlyNameText.Text = command is null ? "Choose an operation" : FriendlyCommandName(command);
+        CommandDescriptionText.Text = command is null ? "A plain-language explanation will appear here." : DescribeCommand(command);
+        CommandRiskText.Text = command is null ? "Risk --" : $"{EstimateCommandRisk(command)} risk";
+        RunCommandLabel.Text = mutating ? "Review required" : "Run inspection";
         CommandSchemaText.Text = command is not null && _commandSchemas.TryGetValue(command, out var schema)
             ? JsonSerializer.Serialize(schema, new JsonSerializerOptions { WriteIndented = true })
             : "Select a command to inspect its schema.";
@@ -1642,6 +2242,48 @@ public sealed partial class MainWindow : Window
         }
         else StructuredArgumentsPanel.Children.Clear();
     }
+
+    private void CommandArgumentsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var command = CommandPicker?.SelectedItem?.ToString();
+        if (command is null || CommandRiskText is null || CommandDescriptionText is null) return;
+        try
+        {
+            using var document = JsonDocument.Parse(CommandArgumentsTextBox.Text);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
+            CommandRiskText.Text = $"{EstimateCommandRisk(command, document.RootElement)} risk";
+            CommandDescriptionText.Text = DescribeCommand(command, document.RootElement);
+        }
+        catch (JsonException)
+        {
+            if (command == "axl")
+            {
+                CommandRiskText.Text = "High risk";
+                CommandDescriptionText.Text = "The AXL payload is not valid JSON yet, so its inner operation cannot be classified.";
+            }
+        }
+    }
+
+    private void CommandShortcutButton_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not Button { Tag: string command } || !_commandSchemas.ContainsKey(command)) return;
+        CommandSearchTextBox.Text = string.Empty;
+        CommandCategoryPicker.SelectedIndex = 0;
+        ApplyCommandFilters();
+        CommandPicker.SelectedItem = command;
+    }
+
+    private static string FriendlyCommandName(string command) => command switch
+    {
+        "get_selection" => "Inspect the current Studio selection",
+        "read_source" => "Read a script",
+        "get_properties" => "Inspect instance properties",
+        "create_script" => "Create a new script",
+        "multi_edit" => "Edit a script with exact replacements",
+        "set_properties" => "Change instance properties",
+        "execute_luau" => "Run Luau in Edit mode",
+        _ => string.Join(" ", command.Split('_').Select((word, index) => index == 0 ? char.ToUpperInvariant(word[0]) + word[1..] : word))
+    };
 
     private void BuildStructuredArgumentControls(JsonElement schema)
     {
@@ -1659,7 +2301,8 @@ public sealed partial class MainWindow : Window
             : new HashSet<string>(StringComparer.Ordinal);
         foreach (var property in properties.EnumerateObject())
         {
-            var label = new TextBlock { Text = required.Contains(property.Name) ? $"{property.Name}  *" : property.Name, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
+            var fieldName = FriendlyArgumentName(property.Name);
+            var label = new TextBlock { Text = required.Contains(property.Name) ? $"{fieldName}  *" : fieldName, FontWeight = Microsoft.UI.Text.FontWeights.SemiBold };
             FrameworkElement control;
             if (property.Value.TryGetProperty("enum", out var choices) && choices.ValueKind == JsonValueKind.Array)
             {
@@ -1685,19 +2328,61 @@ public sealed partial class MainWindow : Window
                 else
                 {
                     var structuredJson = type is "array" or "object";
-                    var box = new TextBox { PlaceholderText = structuredJson ? (type == "array" ? "[]" : "{}") : "Enter value", AcceptsReturn = structuredJson };
-                    if (structuredJson) box.FontFamily = new FontFamily("Consolas");
+                    var longText = property.Name is "source" or "code" or "old_string" or "new_string";
+                    var box = new TextBox
+                    {
+                        PlaceholderText = ArgumentPlaceholder(property.Name, type),
+                        AcceptsReturn = structuredJson || longText,
+                        TextWrapping = longText ? TextWrapping.Wrap : TextWrapping.NoWrap,
+                        MinHeight = longText ? 88 : 0
+                    };
+                    if (structuredJson || longText) box.FontFamily = new FontFamily("Consolas");
                     box.TextChanged += StructuredArgument_Changed;
                     control = box;
                 }
             }
             control.Tag = new StructuredArgumentTag(property.Name, property.Value.TryGetProperty("type", out var kind) ? kind.GetString() ?? "string" : "string", required.Contains(property.Name));
             _structuredArgumentControls[property.Name] = control;
-            StructuredArgumentsPanel.Children.Add(new StackPanel { Spacing = 4, Children = { label, control } });
+            var field = new StackPanel { Spacing = 4 };
+            field.Children.Add(label);
+            if (property.Value.TryGetProperty("description", out var description) && description.ValueKind == JsonValueKind.String)
+                field.Children.Add(new TextBlock { Text = description.GetString(), Foreground = ThemeBrush("TextFillColorSecondaryBrush"), TextWrapping = TextWrapping.Wrap });
+            field.Children.Add(control);
+            StructuredArgumentsPanel.Children.Add(field);
         }
         _syncingStructuredArguments = false;
         SyncStructuredArgumentsToJson();
     }
+
+    private static string FriendlyArgumentName(string name)
+    {
+        var known = name switch
+        {
+            "className" => "Script type",
+            "file_path" => "Script path",
+            "expectedHash" => "Expected source hash",
+            "old_string" => "Text to replace",
+            "new_string" => "Replacement text",
+            "replace_all" => "Replace every match",
+            "dryRun" => "Preview only",
+            _ => string.Concat(name.Select((character, index) => index > 0 && char.IsUpper(character) ? $" {char.ToLowerInvariant(character)}" : character.ToString())).Replace('_', ' ')
+        };
+        return known.Length == 0 ? name : char.ToUpperInvariant(known[0]) + known[1..];
+    }
+
+    private static string ArgumentPlaceholder(string name, string? type) => name switch
+    {
+        "path" or "file_path" => "ServerScriptService.MyScript",
+        "parent" => "ServerScriptService",
+        "name" => "MyScript",
+        "source" => "-- Luau source",
+        "code" => "-- Luau to run",
+        "old_string" => "Exact existing text",
+        "new_string" => "Exact replacement text",
+        _ when type == "array" => "[]",
+        _ when type == "object" => "{}",
+        _ => "Enter value"
+    };
 
     private void StructuredArgument_Changed(object sender, object e)
     {
@@ -1863,6 +2548,21 @@ public sealed partial class MainWindow : Window
     {
         _approvalQueueItems.Clear();
         ExecuteApprovalQueueButton.IsEnabled = false;
+    }
+
+    private async void OpenChangeReviewQueueButton_Click(object sender, RoutedEventArgs e)
+    {
+        await RefreshChangeReviewAsync();
+        CategoryNavigation.SelectedItem = ReviewNavigationItem;
+    }
+
+    private void UpdateApprovalQueueState()
+    {
+        if (ApprovalQueueEmptyState is null) return;
+        var hasItems = _approvalQueueItems.Count > 0;
+        ApprovalQueueEmptyState.Visibility = hasItems ? Visibility.Collapsed : Visibility.Visible;
+        ApprovalQueueList.Visibility = hasItems ? Visibility.Visible : Visibility.Collapsed;
+        ExecuteApprovalQueueButton.IsEnabled = hasItems;
     }
 
     private async void ExecuteApprovalQueueButton_Click(object sender, RoutedEventArgs e)
@@ -3003,6 +3703,7 @@ public sealed partial class MainWindow : Window
     private sealed record EditorSession(string? ActivePath, IReadOnlyList<EditorSessionDocument> Documents);
     private sealed record EditorSessionDocument(string Path, string? Source, string? Hash, bool Dirty);
     private sealed record AiMemoryItem(string CreatedAt, string Text);
+    private sealed record AiResearchResult(string Evidence, string Receipt);
     private sealed record AiProjectState(string? Instructions, IReadOnlyList<AiMemoryItem>? Memories, IReadOnlyList<AiMessage>? Conversation);
     private sealed record IntelligenceEventRow(string Time, string Title, string Detail);
     private sealed record IntelligenceSuggestionRow(string Key, string Time, string Title, string Evidence, string Confidence);
@@ -3018,6 +3719,8 @@ public sealed partial class MainWindow : Window
     private sealed record CommandPreset(string Command, string Arguments);
     private sealed record StructuredArgumentTag(string Name, string Type, bool Required);
     private sealed record ApprovalQueueRow(string Position, string Command, string Summary, JsonElement Arguments);
+    private sealed record ChangeReviewRow(string Key, string Kind, string Title, string Target, string Risk, string Summary, string Validation, string Payload, string? ExpectedHash, ApprovalQueueRow? Command);
+    private sealed record EditorRollback(string Path, string BeforeSource, string? AppliedHash);
     private sealed record WorkflowCommand(string Command, string Arguments);
     private sealed record CommandWorkflow(IReadOnlyList<WorkflowCommand> Commands);
     private sealed record CommandWorkspaceState(

@@ -7,31 +7,32 @@
         <DesktopAcrylicBackdrop />
     </Window.SystemBackdrop>
 
-    <Grid x:Name="RootGrid" Background="Transparent" SizeChanged="RootGrid_SizeChanged">
+    <Grid x:Name="RootGrid" Background="{ThemeResource AppCanvasBrush}" SizeChanged="RootGrid_SizeChanged">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="AppTitleBar" Title="Abraxius" Subtitle="Roblox Studio workspace">
+        <TitleBar x:Name="AppTitleBar" Title="Abraxius" Subtitle="Roblox Studio workspace" Background="{ThemeResource NavigationSurfaceBrush}">
             <TitleBar.IconSource>
                 <ImageIconSource ImageSource="Assets/Logo.png" />
             </TitleBar.IconSource>
         </TitleBar>
 
-        <NavigationView Grid.Row="1" x:Name="CategoryNavigation" PaneDisplayMode="Auto" CompactPaneLength="48" OpenPaneLength="184" IsPaneToggleButtonVisible="True" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" SelectionChanged="CategoryNavigation_SelectionChanged">
+        <NavigationView Grid.Row="1" x:Name="CategoryNavigation" Background="Transparent" PaneDisplayMode="Auto" CompactPaneLength="52" OpenPaneLength="196" IsPaneToggleButtonVisible="True" IsBackButtonVisible="Collapsed" IsSettingsVisible="False" SelectionChanged="CategoryNavigation_SelectionChanged">
             <NavigationView.MenuItems>
-                <NavigationViewItem x:Name="OverviewNavigationItem" Content="Home" Tag="overview" IsSelected="True"><NavigationViewItem.Icon><SymbolIcon Symbol="Home" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Activity" Tag="playtest"><NavigationViewItem.Icon><SymbolIcon Symbol="Play" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Intelligence" Tag="intelligence"><NavigationViewItem.Icon><SymbolIcon Symbol="View" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Sync" Tag="scripts"><NavigationViewItem.Icon><SymbolIcon Symbol="Sync" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Code" Tag="code"><NavigationViewItem.Icon><SymbolIcon Symbol="Edit" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="AI" Tag="ai"><NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Commands" Tag="commands"><NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" /></NavigationViewItem.Icon></NavigationViewItem>
-                <NavigationViewItem Content="Diagnostics" Tag="output"><NavigationViewItem.Icon><SymbolIcon Symbol="Message" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem x:Name="OverviewNavigationItem" Content="Home" Tag="overview" IsSelected="True"><NavigationViewItem.Icon><SymbolIcon Symbol="Home" Foreground="{ThemeResource BrandAccentBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Activity" Tag="playtest"><NavigationViewItem.Icon><SymbolIcon Symbol="Play" Foreground="{ThemeResource BrandWarmBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Intelligence" Tag="intelligence"><NavigationViewItem.Icon><SymbolIcon Symbol="View" Foreground="{ThemeResource BrandSecondaryBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Sync" Tag="scripts"><NavigationViewItem.Icon><SymbolIcon Symbol="Sync" Foreground="{ThemeResource BrandSecondaryBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Code" Tag="code"><NavigationViewItem.Icon><SymbolIcon Symbol="Edit" Foreground="{ThemeResource BrandAccentBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem x:Name="ReviewNavigationItem" Content="Review" Tag="review"><NavigationViewItem.Icon><SymbolIcon Symbol="Permissions" Foreground="{ThemeResource BrandWarmBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="AI" Tag="ai"><NavigationViewItem.Icon><SymbolIcon Symbol="Message" Foreground="{ThemeResource BrandWarmBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Commands" Tag="commands"><NavigationViewItem.Icon><SymbolIcon Symbol="AllApps" Foreground="{ThemeResource BrandAccentBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Diagnostics" Tag="output"><NavigationViewItem.Icon><SymbolIcon Symbol="Message" Foreground="{ThemeResource BrandWarmBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
             </NavigationView.MenuItems>
             <NavigationView.FooterMenuItems>
-                <NavigationViewItem Content="Settings" Tag="settings"><NavigationViewItem.Icon><SymbolIcon Symbol="Setting" /></NavigationViewItem.Icon></NavigationViewItem>
+                <NavigationViewItem Content="Settings" Tag="settings"><NavigationViewItem.Icon><SymbolIcon Symbol="Setting" Foreground="{ThemeResource BrandSecondaryBrush}" /></NavigationViewItem.Icon></NavigationViewItem>
             </NavigationView.FooterMenuItems>
             <Grid>
         <ScrollViewer x:Name="OverviewPage" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -47,27 +48,30 @@
 
                 <InfoBar x:Name="MessageBar" IsOpen="False" IsClosable="True" />
 
-                <Grid Grid.Row="1" Margin="0,10,0,0" ColumnSpacing="16">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
-                    <StackPanel Spacing="3">
-                        <TextBlock Text="Studio workspace" Style="{ThemeResource PageTitleStyle}" />
-                        <TextBlock x:Name="DetailText" Text="Reading local host status..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                    </StackPanel>
-                    <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6" VerticalAlignment="Center">
-                        <Button x:Name="RefreshButton" Click="RefreshButton_Click" Width="38" Height="38" Padding="0" AutomationProperties.Name="Refresh status" ToolTipService.ToolTip="Refresh status">
-                            <SymbolIcon Symbol="Refresh" />
-                        </Button>
-                        <Button x:Name="CopyStatusButton" Click="CopyStatusButton_Click" Width="38" Height="38" Padding="0" AutomationProperties.Name="Copy status" ToolTipService.ToolTip="Copy status summary">
-                            <SymbolIcon Symbol="Copy" />
-                        </Button>
-                        <Button x:Name="DataFolderButton" Click="DataFolderButton_Click" Width="38" Height="38" Padding="0" AutomationProperties.Name="Open data folder" ToolTipService.ToolTip="Open Abraxius data folder">
-                            <SymbolIcon Symbol="Folder" />
-                        </Button>
-                    </StackPanel>
-                </Grid>
+                <Border Grid.Row="1" Margin="0,10,0,0" Style="{ThemeResource HeroCardStyle}">
+                    <Grid ColumnSpacing="18">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Spacing="5">
+                            <TextBlock Text="ABRAXIUS CONTROL DECK" Style="{ThemeResource EyebrowTextStyle}" />
+                            <TextBlock Text="Studio workspace" Style="{ThemeResource PageTitleStyle}" />
+                            <TextBlock x:Name="DetailText" Text="Reading local host status..." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                            <Button x:Name="RefreshButton" Click="RefreshButton_Click" Width="40" Height="40" Padding="0" Background="{ThemeResource BrandAccentSoftBrush}" Foreground="{ThemeResource BrandAccentBrush}" AutomationProperties.Name="Refresh status" ToolTipService.ToolTip="Refresh status">
+                                <SymbolIcon Symbol="Refresh" />
+                            </Button>
+                            <Button x:Name="CopyStatusButton" Click="CopyStatusButton_Click" Width="40" Height="40" Padding="0" Background="{ThemeResource BrandSecondarySoftBrush}" Foreground="{ThemeResource BrandSecondaryBrush}" AutomationProperties.Name="Copy status" ToolTipService.ToolTip="Copy status summary">
+                                <SymbolIcon Symbol="Copy" />
+                            </Button>
+                            <Button x:Name="DataFolderButton" Click="DataFolderButton_Click" Width="40" Height="40" Padding="0" Background="{ThemeResource BrandWarmSoftBrush}" Foreground="{ThemeResource BrandWarmBrush}" AutomationProperties.Name="Open data folder" ToolTipService.ToolTip="Open Abraxius data folder">
+                                <SymbolIcon Symbol="Folder" />
+                            </Button>
+                        </StackPanel>
+                    </Grid>
+                </Border>
 
                 <Grid x:Name="HomeStatusGrid" Grid.Row="2" Margin="0,18,0,0" ColumnSpacing="12" RowSpacing="12">
                     <Grid.ColumnDefinitions>
@@ -76,10 +80,10 @@
                         <ColumnDefinition Width="*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border x:Name="ServerStatusCard" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                    <Border x:Name="ServerStatusCard" Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource ServerCardBrush}">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <Border Width="38" Height="38" CornerRadius="8" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}">
+                            <Border Style="{ThemeResource IconTileStyle}" Background="{ThemeResource SystemFillColorSuccessBackgroundBrush}">
                                 <FontIcon Glyph="&#xE968;" FontSize="17" Foreground="{ThemeResource SystemFillColorSuccessBrush}" />
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
@@ -93,11 +97,11 @@
                         </Grid>
                     </Border>
 
-                    <Border x:Name="StudioStatusCard" Grid.Column="1" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                    <Border x:Name="StudioStatusCard" Grid.Column="1" Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource StudioCardBrush}">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                            <Border Width="38" Height="38" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                                <FontIcon Glyph="&#xE774;" FontSize="17" />
+                            <Border Style="{ThemeResource IconTileStyle}">
+                                <FontIcon Glyph="&#xE774;" FontSize="17" Foreground="{ThemeResource BrandAccentBrush}" />
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="STUDIO LINK" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -113,11 +117,11 @@
                         </Grid>
                     </Border>
 
-                    <Border x:Name="PluginStatusCard" Grid.Column="2" Padding="16" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                    <Border x:Name="PluginStatusCard" Grid.Column="2" Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource SyncCardBrush}">
                         <Grid ColumnSpacing="12">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="Auto" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <Border Width="38" Height="38" CornerRadius="8" Background="{ThemeResource SubtleFillColorSecondaryBrush}">
-                                <FontIcon Glyph="&#xE8D4;" FontSize="17" />
+                            <Border Style="{ThemeResource IconTileStyle}" Background="{ThemeResource BrandSecondarySoftBrush}">
+                                <FontIcon Glyph="&#xE8D4;" FontSize="17" Foreground="{ThemeResource BrandSecondaryBrush}" />
                             </Border>
                             <StackPanel Grid.Column="1" Spacing="2" VerticalAlignment="Center">
                                 <TextBlock Text="STUDIO SYNC" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
@@ -137,14 +141,14 @@
                         <ColumnDefinition Width="0.9*" />
                     </Grid.ColumnDefinitions>
 
-                    <Border x:Name="ServerControlsCard" Padding="18" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                    <Border x:Name="ServerControlsCard" Style="{ThemeResource SectionCardStyle}" Background="{ThemeResource CardSurfaceStrongBrush}">
                         <StackPanel Spacing="14">
                             <Grid>
                                 <TextBlock Text="Server controls" FontSize="16" FontWeight="SemiBold" />
                                 <TextBlock Text="RUST HOST" HorizontalAlignment="Right" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" />
                             </Grid>
                             <StackPanel Orientation="Horizontal" Spacing="8">
-                                <Button x:Name="StartButton" Click="StartButton_Click" Style="{ThemeResource AccentButtonStyle}">
+                                <Button x:Name="StartButton" Click="StartButton_Click" Style="{ThemeResource BrandPrimaryButtonStyle}">
                                     <StackPanel Orientation="Horizontal" Spacing="8">
                                         <SymbolIcon Symbol="Play" />
                                         <TextBlock x:Name="StartButtonText" Text="Start server" />
@@ -196,7 +200,7 @@
                         </StackPanel>
                     </Border>
 
-                    <Border x:Name="RuntimeCard" Grid.Column="1" Padding="18" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                    <Border x:Name="RuntimeCard" Grid.Column="1" Style="{ThemeResource SectionCardStyle}">
                         <StackPanel Spacing="13">
                             <TextBlock Text="Runtime" FontSize="16" FontWeight="SemiBold" />
                             <Grid RowSpacing="11" ColumnSpacing="16">
@@ -216,7 +220,7 @@
                     </Border>
                 </Grid>
 
-                <Border Grid.Row="4" Margin="0,14,0,0" Padding="18" CornerRadius="8" Background="{ThemeResource GlassSurfaceStrongBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1">
+                <Border Grid.Row="4" Margin="0,14,0,0" Style="{ThemeResource SectionCardStyle}" Background="{ThemeResource CardSurfaceStrongBrush}">
                     <StackPanel Spacing="13">
                         <Grid>
                             <StackPanel Spacing="2">
@@ -264,10 +268,10 @@
                         </StackPanel>
                         <Grid Grid.Row="1" ColumnSpacing="12">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
-                            <Border Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="SESSION" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestStateText" Text="Waiting" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="PlaytestDurationText" Text="--" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></Border>
-                            <Border Grid.Column="1" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="ERRORS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestErrorText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" /></StackPanel></Border>
-                            <Border Grid.Column="2" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="WARNINGS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestWarningText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCautionBrush}" /></StackPanel></Border>
-                            <Border Grid.Column="3" Padding="14" CornerRadius="8" Background="{ThemeResource GlassSurfaceBrush}" BorderBrush="{ThemeResource GlassStrokeBrush}" BorderThickness="1"><StackPanel Spacing="3"><TextBlock Text="PRINTS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestPrintText" Text="0" FontSize="20" FontWeight="SemiBold" /></StackPanel></Border>
+                            <Border Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource StudioCardBrush}"><StackPanel Spacing="3"><TextBlock Text="SESSION" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource BrandAccentBrush}" /><TextBlock x:Name="PlaytestStateText" Text="Waiting" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="PlaytestDurationText" Text="--" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></Border>
+                            <Border Grid.Column="1" Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource BrandWarmSoftBrush}"><StackPanel Spacing="3"><TextBlock Text="ERRORS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource BrandWarmBrush}" /><TextBlock x:Name="PlaytestErrorText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCriticalBrush}" /></StackPanel></Border>
+                            <Border Grid.Column="2" Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource CardSurfaceBrush}"><StackPanel Spacing="3"><TextBlock Text="WARNINGS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBlock x:Name="PlaytestWarningText" Text="0" FontSize="20" FontWeight="SemiBold" Foreground="{ThemeResource SystemFillColorCautionBrush}" /></StackPanel></Border>
+                            <Border Grid.Column="3" Style="{ThemeResource StatusCardStyle}" Background="{ThemeResource SyncCardBrush}"><StackPanel Spacing="3"><TextBlock Text="PRINTS" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource BrandSecondaryBrush}" /><TextBlock x:Name="PlaytestPrintText" Text="0" FontSize="20" FontWeight="SemiBold" /></StackPanel></Border>
                         </Grid>
                         <Grid Grid.Row="2" ColumnSpacing="14">
                             <Grid.ColumnDefinitions><ColumnDefinition Width="1.15*" /><ColumnDefinition Width="0.85*" /></Grid.ColumnDefinitions>
@@ -300,7 +304,7 @@
                         <TextBox x:Name="EditorScriptPathTextBox" Header="Studio script path" PlaceholderText="ServerScriptService.MyScript" />
                         <Button Grid.Column="1" VerticalAlignment="Bottom" Click="PullEditorScriptButton_Click"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Download" /><TextBlock Text="Pull" /></StackPanel></Button>
                         <Button x:Name="PreviewEditorChangesButton" Grid.Column="2" VerticalAlignment="Bottom" Click="PreviewEditorChangesButton_Click" IsEnabled="False" Content="Preview changes" />
-                        <Button x:Name="PushEditorChangesButton" Grid.Column="3" VerticalAlignment="Bottom" Style="{ThemeResource AccentButtonStyle}" Click="PushEditorChangesButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Upload" /><TextBlock Text="Push to Studio" /></StackPanel></Button>
+                        <Button x:Name="PushEditorChangesButton" Grid.Column="3" VerticalAlignment="Bottom" Style="{ThemeResource BrandPrimaryButtonStyle}" Click="PushEditorChangesButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Permissions" /><TextBlock Text="Review change" /></StackPanel></Button>
                     </Grid>
                     <TabView x:Name="EditorTabs" Grid.Row="2" IsAddTabButtonVisible="False" TabCloseRequested="EditorTabs_TabCloseRequested" SelectionChanged="EditorTabs_SelectionChanged" />
                     <Grid x:Name="CodeWorkspaceGrid" Grid.Row="3" ColumnSpacing="12">
@@ -325,23 +329,106 @@
                     </Grid>
                 </Grid>
 
+                <Grid x:Name="ReviewPage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
+                    <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
+                    <Border Style="{ThemeResource HeroCardStyle}">
+                        <Grid ColumnSpacing="18">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="SAFE DELIVERY" Style="{ThemeResource EyebrowTextStyle}" />
+                                <TextBlock Text="Change Review" Style="{ThemeResource PageTitleStyle}" />
+                                <TextBlock Text="Understand scope, risk, validation, and the exact Studio operation before approving it." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
+                                <Border Padding="11,7" CornerRadius="12" Background="{ThemeResource BrandSecondarySoftBrush}"><TextBlock x:Name="ReviewLowRiskText" Text="0 low" Foreground="{ThemeResource BrandSecondaryBrush}" /></Border>
+                                <Border Padding="11,7" CornerRadius="12" Background="{ThemeResource BrandAccentSoftBrush}"><TextBlock x:Name="ReviewMediumRiskText" Text="0 medium" Foreground="{ThemeResource BrandAccentBrush}" /></Border>
+                                <Border Padding="11,7" CornerRadius="12" Background="{ThemeResource BrandWarmSoftBrush}"><TextBlock x:Name="ReviewHighRiskText" Text="0 high" Foreground="{ThemeResource BrandWarmBrush}" /></Border>
+                                <Button Click="RefreshChangeReviewButton_Click" Width="40" Height="40" Padding="0" ToolTipService.ToolTip="Refresh staged changes"><SymbolIcon Symbol="Refresh" /></Button>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <InfoBar x:Name="ReviewInfoBar" Grid.Row="1" IsOpen="True" IsClosable="False" Severity="Informational" Title="No changes staged" Message="Dirty editor buffers and queued commands appear here automatically." />
+                    <Grid Grid.Row="2" ColumnSpacing="14">
+                        <Grid.ColumnDefinitions><ColumnDefinition Width="0.85*" /><ColumnDefinition Width="1.15*" /></Grid.ColumnDefinitions>
+                        <Border Style="{ThemeResource SectionCardStyle}" Background="{ThemeResource CardSurfaceStrongBrush}">
+                            <Grid RowSpacing="10">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <StackPanel Spacing="2"><TextBlock Text="Staged changes" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Local drafts and approval-queue mutations" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                                <ListView x:Name="ChangeReviewList" Grid.Row="1" SelectionMode="Single" SelectionChanged="ChangeReviewList_SelectionChanged">
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate>
+                                            <Grid Padding="4,9" ColumnSpacing="10">
+                                                <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                                <StackPanel Spacing="3">
+                                                    <TextBlock Text="{Binding Title}" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Target}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                                                    <TextBlock Text="{Binding Summary}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" MaxLines="2" />
+                                                </StackPanel>
+                                                <Border Grid.Column="1" Padding="9,4" CornerRadius="10" Background="{ThemeResource BrandWarmSoftBrush}" VerticalAlignment="Top"><TextBlock Text="{Binding Risk}" Foreground="{ThemeResource BrandWarmBrush}" FontWeight="SemiBold" /></Border>
+                                            </Grid>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                                <Button Grid.Row="2" Click="DismissReviewItemButton_Click" Content="Dismiss from review" />
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="1" Style="{ThemeResource SectionCardStyle}">
+                            <Grid RowSpacing="12">
+                                <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                <Grid>
+                                    <StackPanel Spacing="3"><TextBlock x:Name="ReviewDetailTitle" Text="Select a staged change" FontSize="20" FontWeight="SemiBold" /><TextBlock x:Name="ReviewDetailTarget" Text="No target selected" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /></StackPanel>
+                                    <Border HorizontalAlignment="Right" Padding="10,5" CornerRadius="10" Background="{ThemeResource BrandAccentSoftBrush}"><TextBlock x:Name="ReviewDetailRisk" Text="Risk --" Foreground="{ThemeResource BrandAccentBrush}" FontWeight="SemiBold" /></Border>
+                                </Grid>
+                                <Border Grid.Row="1" Padding="12" CornerRadius="12" Background="{ThemeResource BrandAccentSoftBrush}">
+                                    <StackPanel Spacing="4"><TextBlock Text="What will happen" FontWeight="SemiBold" Foreground="{ThemeResource BrandAccentBrush}" /><TextBlock x:Name="ReviewExplanationText" Text="Choose an item to inspect its intended operation." TextWrapping="Wrap" /></StackPanel>
+                                </Border>
+                                <Border Grid.Row="2" Padding="12" CornerRadius="12" Background="{ThemeResource BrandSecondarySoftBrush}">
+                                    <StackPanel Spacing="4"><TextBlock Text="Preflight" FontWeight="SemiBold" Foreground="{ThemeResource BrandSecondaryBrush}" /><TextBlock x:Name="ReviewValidationText" Text="No validation has run." TextWrapping="Wrap" /></StackPanel>
+                                </Border>
+                                <TextBox x:Name="ReviewDiffTextBox" Grid.Row="3" Header="Exact preview / arguments" Text="Select a change to inspect it." IsReadOnly="True" AcceptsReturn="True" FontFamily="Cascadia Mono, Consolas" TextWrapping="NoWrap" MinHeight="220" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                <Grid Grid.Row="4" ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                                    <TextBlock Text="Every apply requires confirmation. Nothing on this page runs automatically." Foreground="{ThemeResource TextFillColorTertiaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <Button x:Name="RollbackLastChangeButton" Grid.Column="1" Click="RollbackLastChangeButton_Click" IsEnabled="False" Content="Rollback last source apply" />
+                                    <Button x:Name="ApplyReviewedChangeButton" Grid.Column="2" Style="{ThemeResource BrandPrimaryButtonStyle}" Click="ApplyReviewedChangeButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Accept" /><TextBlock Text="Apply selected" /></StackPanel></Button>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+
                 <Grid x:Name="AiPage" Visibility="Collapsed" Padding="28,18,28,28" RowSpacing="14">
                     <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions>
-                    <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Spacing="3"><TextBlock Text="AI workspace" Style="{ThemeResource PageTitleStyle}" /><TextBlock Text="Chat with an Ollama model using context you explicitly choose." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel><StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center"><Ellipse x:Name="AiProviderDot" Width="8" Height="8" Fill="{ThemeResource SystemFillColorNeutralBrush}" /><TextBlock x:Name="AiProviderStatusText" Text="Checking Ollama" /></StackPanel></Grid>
+                    <Border Style="{ThemeResource HeroCardStyle}">
+                        <Grid ColumnSpacing="18">
+                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
+                            <StackPanel Spacing="5">
+                                <TextBlock Text="LOCAL INTELLIGENCE" Style="{ThemeResource EyebrowTextStyle}" />
+                                <TextBlock Text="Studio Copilot" Style="{ThemeResource PageTitleStyle}" />
+                                <TextBlock Text="Ask about the live place. Abraxius retrieves task-relevant context through AXL before the model answers." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Border Grid.Column="1" Padding="12,7" CornerRadius="12" Background="{ThemeResource BrandSecondarySoftBrush}" VerticalAlignment="Center">
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Ellipse x:Name="AiProviderDot" Width="8" Height="8" Fill="{ThemeResource BrandSecondaryBrush}" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="AiProviderStatusText" Text="Checking Ollama" Foreground="{ThemeResource BrandSecondaryBrush}" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </Border>
                     <Grid x:Name="AiWorkspaceGrid" Grid.Row="1" ColumnSpacing="14" RowSpacing="14">
                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition x:Name="AiContextColumn" Width="320" /></Grid.ColumnDefinitions>
                         <Grid.RowDefinitions><RowDefinition Height="*" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
-                        <Border Style="{ThemeResource SectionCardStyle}" Padding="14">
-                            <Grid RowSpacing="10"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ComboBox x:Name="AiModelPicker" Header="Ollama model" PlaceholderText="Select a model" DisplayMemberPath="DisplayName" /><Button Grid.Column="1" VerticalAlignment="Bottom" Click="RefreshAiModelsButton_Click"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Refresh" /><TextBlock Text="Refresh" /></StackPanel></Button></Grid><TextBox x:Name="AiTranscriptTextBox" Grid.Row="1" Text="Abraxius AI is ready. Choose a model and send a message." IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" ScrollViewer.VerticalScrollBarVisibility="Auto" /></Grid>
+                        <Border Style="{ThemeResource SectionCardStyle}" Padding="14" Background="{ThemeResource CardSurfaceStrongBrush}">
+                            <Grid RowSpacing="10"><Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="*" /></Grid.RowDefinitions><Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ComboBox x:Name="AiModelPicker" Header="Ollama model" PlaceholderText="Select a model" DisplayMemberPath="DisplayName" /><Button Grid.Column="1" VerticalAlignment="Bottom" Click="RefreshAiModelsButton_Click" Background="{ThemeResource BrandSecondarySoftBrush}" Foreground="{ThemeResource BrandSecondaryBrush}"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Refresh" /><TextBlock Text="Refresh" /></StackPanel></Button></Grid><TextBox x:Name="AiTranscriptTextBox" Grid.Row="1" Text="Abraxius AI is ready. Choose a model and send a message." IsReadOnly="True" AcceptsReturn="True" TextWrapping="Wrap" FontFamily="Cascadia Mono, Consolas" Background="{ThemeResource AppCanvasBrush}" BorderThickness="0" CornerRadius="12" Padding="14" ScrollViewer.VerticalScrollBarVisibility="Auto" /></Grid>
                         </Border>
-                        <Border Grid.Row="1" Style="{ThemeResource SectionCardStyle}" Padding="12">
-                            <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="AiPromptTextBox" PlaceholderText="Ask about the open place, editor source, or runtime output…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" /><Button x:Name="SendAiMessageButton" Grid.Column="1" VerticalAlignment="Center" Style="{ThemeResource AccentButtonStyle}" Click="SendAiMessageButton_Click" Content="Send" /><Button x:Name="CancelAiMessageButton" Grid.Column="2" VerticalAlignment="Center" Click="CancelAiMessageButton_Click" Content="Cancel" IsEnabled="False" /></Grid>
+                        <Border Grid.Row="1" Style="{ThemeResource SectionCardStyle}" Padding="12" Background="{ThemeResource BrandAccentSoftBrush}" BorderBrush="{ThemeResource BrandAccentSoftBrush}">
+                            <Grid ColumnSpacing="10"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><TextBox x:Name="AiPromptTextBox" PlaceholderText="Ask about the open place, editor source, or runtime output…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="64" /><Button x:Name="SendAiMessageButton" Grid.Column="1" VerticalAlignment="Center" Style="{ThemeResource BrandPrimaryButtonStyle}" Click="SendAiMessageButton_Click" Content="Send" /><Button x:Name="CancelAiMessageButton" Grid.Column="2" VerticalAlignment="Center" Click="CancelAiMessageButton_Click" Content="Cancel" IsEnabled="False" /></Grid>
                         </Border>
                         <ScrollViewer x:Name="AiContextPanel" Grid.Column="1" Grid.RowSpan="2" VerticalScrollBarVisibility="Auto"><StackPanel Spacing="12">
-                            <InfoBar x:Name="AiContextInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Context is local" Message="Abraxius sends only the enabled context sections to the selected Ollama model." />
-                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Project memory" FontSize="18" FontWeight="SemiBold" /><TextBlock x:Name="AiProjectIdentityText" Text="Resolving Studio project…" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBox x:Name="AiProjectInstructionsTextBox" Header="Project instructions" PlaceholderText="Architecture, conventions, safety rules…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" /><Button Click="SaveAiProjectInstructionsButton_Click" Content="Save instructions" /><TextBox x:Name="AiMemoryInputTextBox" Header="Pin memory" PlaceholderText="A durable project fact" /><Button Click="AddAiMemoryButton_Click" Content="Add memory" /><ListView x:Name="AiMemoryList" Height="130" SelectionMode="Single"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="2,5"><TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxLines="3" /><TextBlock Text="{Binding CreatedAt}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView><Button Click="DeleteAiMemoryButton_Click" Content="Delete selected memory" /></StackPanel></Border>
-                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="12"><TextBlock Text="Include context" FontSize="18" FontWeight="SemiBold" /><ToggleSwitch x:Name="AiStudioContextToggle" Header="Studio state and selection" IsOn="True" /><ToggleSwitch x:Name="AiEditorContextToggle" Header="Active editor source" IsOn="True" /><ToggleSwitch x:Name="AiRuntimeContextToggle" Header="Recent runtime output" IsOn="True" /><Button Click="PreviewAiContextButton_Click" Content="Preview context" /></StackPanel></Border>
-                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="8"><TextBlock Text="Session and handoff" FontSize="18" FontWeight="SemiBold" /><ToggleSwitch x:Name="AiLocalModelsOnlyToggle" Header="Local models only" IsOn="True" Toggled="AiLocalModelsOnlyToggle_Toggled" /><TextBlock x:Name="AiContextSizeText" Text="Context not built" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /><Button Click="DraftAiCommandPlanButton_Click" Content="Draft command plan" /><Button Click="GenerateAiBriefingButton_Click" Content="Generate compact briefing" /><Button Click="ExportAiProjectButton_Click" Content="Export memory and conversation" /><Button Click="CompactAiConversationButton_Click" Content="Compact conversation into memory" /><Button Click="ClearAiConversationButton_Click" Content="Clear conversation" /></StackPanel></Border>
+                            <InfoBar x:Name="AiContextInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Task-aware context" Message="AXL scouts the live place for each request. Nothing is changed without your approval." />
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="10"><TextBlock Text="Project memory" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource BrandWarmBrush}" /><TextBlock x:Name="AiProjectIdentityText" Text="Resolving Studio project…" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /><TextBox x:Name="AiProjectInstructionsTextBox" Header="Project instructions" PlaceholderText="Architecture, conventions, safety rules…" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="80" /><Button Click="SaveAiProjectInstructionsButton_Click" Content="Save instructions" /><TextBox x:Name="AiMemoryInputTextBox" Header="Pin memory" PlaceholderText="A durable project fact" /><Button Click="AddAiMemoryButton_Click" Content="Add memory" /><ListView x:Name="AiMemoryList" Height="130" SelectionMode="Single"><ListView.ItemTemplate><DataTemplate><StackPanel Padding="2,5"><TextBlock Text="{Binding Text}" TextWrapping="Wrap" MaxLines="3" /><TextBlock Text="{Binding CreatedAt}" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /></StackPanel></DataTemplate></ListView.ItemTemplate></ListView><Button Click="DeleteAiMemoryButton_Click" Content="Delete selected memory" /></StackPanel></Border>
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="12"><TextBlock Text="Context strategy" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource BrandAccentBrush}" /><ToggleSwitch x:Name="AiAxlContextToggle" Header="Task-aware AXL retrieval" IsOn="True" /><NumberBox x:Name="AiAxlBudgetBox" Header="AXL token budget" Value="1200" Minimum="256" Maximum="8000" SmallChange="128" SpinButtonPlacementMode="Compact" /><ToggleSwitch x:Name="AiResearchModeToggle" Header="Read-only Research mode" IsOn="True" /><TextBlock Text="Up to 6 bounded AXL reads across 2 rounds. Patch and execute are never available." Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" TextWrapping="Wrap" /><TextBlock x:Name="AiResearchReceiptText" Text="No research run yet" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /><ToggleSwitch x:Name="AiStudioContextToggle" Header="Full Studio snapshot (uses more tokens)" IsOn="False" /><ToggleSwitch x:Name="AiEditorContextToggle" Header="Unsaved active editor source" IsOn="True" /><ToggleSwitch x:Name="AiRuntimeContextToggle" Header="Recent runtime errors and warnings" IsOn="True" /><Button Click="PreviewAiContextButton_Click" Content="Preview assembled context" /></StackPanel></Border>
+                            <Border Style="{ThemeResource SectionCardStyle}"><StackPanel Spacing="8"><TextBlock Text="Session and handoff" FontSize="18" FontWeight="SemiBold" Foreground="{ThemeResource BrandSecondaryBrush}" /><ToggleSwitch x:Name="AiLocalModelsOnlyToggle" Header="Local models only" IsOn="True" Toggled="AiLocalModelsOnlyToggle_Toggled" /><TextBlock x:Name="AiContextSizeText" Text="Context not built" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /><Button Click="DraftAiCommandPlanButton_Click" Content="Draft command plan" /><Button Click="GenerateAiBriefingButton_Click" Content="Generate compact briefing" /><Button Click="ExportAiProjectButton_Click" Content="Export memory and conversation" /><Button Click="CompactAiConversationButton_Click" Content="Compact conversation into memory" /><Button Click="ClearAiConversationButton_Click" Content="Clear conversation" /></StackPanel></Border>
                         </StackPanel></ScrollViewer>
                     </Grid>
                 </Grid>
@@ -353,25 +440,45 @@
                         <StackPanel Spacing="16">
                             <StackPanel Spacing="4">
                                 <TextBlock Text="Commands" Style="{ThemeResource PageTitleStyle}" />
-                                <TextBlock Text="Inspect and operate Studio through the connected companion." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock Text="Choose a task, fill in the details, then inspect or send mutations to Change Review." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
                             </StackPanel>
                             <InfoBar x:Name="CommandInfoBar" IsOpen="True" IsClosable="False" Severity="Informational" Title="Discovering Studio commands" Message="Connect the Studio companion to load its command schemas." />
                             <Border Style="{ThemeResource SectionCardStyle}">
                                 <StackPanel Spacing="14">
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="What do you want to do?" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock Text="Start with a common task or browse every available Studio operation." Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" />
+                                        <Grid ColumnSpacing="8" RowSpacing="8">
+                                            <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions>
+                                            <Grid.RowDefinitions><RowDefinition Height="Auto" /><RowDefinition Height="Auto" /></Grid.RowDefinitions>
+                                            <Button Tag="get_selection" Click="CommandShortcutButton_Click" HorizontalAlignment="Stretch"><StackPanel Spacing="3"><TextBlock Text="Inspect selection" FontWeight="SemiBold" /><TextBlock Text="See what is selected" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Button>
+                                            <Button Grid.Column="1" Tag="read_source" Click="CommandShortcutButton_Click" HorizontalAlignment="Stretch"><StackPanel Spacing="3"><TextBlock Text="Read a script" FontWeight="SemiBold" /><TextBlock Text="Inspect source safely" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Button>
+                                            <Button Grid.Column="2" Tag="get_properties" Click="CommandShortcutButton_Click" HorizontalAlignment="Stretch"><StackPanel Spacing="3"><TextBlock Text="Inspect properties" FontWeight="SemiBold" /><TextBlock Text="Read instance values" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Button>
+                                            <Button Grid.Row="1" Tag="create_script" Click="CommandShortcutButton_Click" HorizontalAlignment="Stretch" Background="{ThemeResource BrandAccentSoftBrush}"><StackPanel Spacing="3"><TextBlock Text="Create a script" FontWeight="SemiBold" Foreground="{ThemeResource BrandAccentBrush}" /><TextBlock Text="Stage a new script" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Button>
+                                            <Button Grid.Row="1" Grid.Column="1" Tag="multi_edit" Click="CommandShortcutButton_Click" HorizontalAlignment="Stretch" Background="{ThemeResource BrandAccentSoftBrush}"><StackPanel Spacing="3"><TextBlock Text="Edit a script" FontWeight="SemiBold" Foreground="{ThemeResource BrandAccentBrush}" /><TextBlock Text="Review exact replacements" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Button>
+                                            <Button Grid.Row="1" Grid.Column="2" Tag="set_properties" Click="CommandShortcutButton_Click" HorizontalAlignment="Stretch" Background="{ThemeResource BrandWarmSoftBrush}"><StackPanel Spacing="3"><TextBlock Text="Change properties" FontWeight="SemiBold" Foreground="{ThemeResource BrandWarmBrush}" /><TextBlock Text="Stage instance updates" Style="{ThemeResource CaptionTextBlockStyle}" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Button>
+                                        </Grid>
+                                    </StackPanel>
+                                    <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="180" /></Grid.ColumnDefinitions>
-                                        <TextBox x:Name="CommandSearchTextBox" Header="Find commands" PlaceholderText="Search by name" TextChanged="CommandSearchTextBox_TextChanged" />
+                                        <TextBox x:Name="CommandSearchTextBox" Header="Browse all commands" PlaceholderText="Search by name" TextChanged="CommandSearchTextBox_TextChanged" />
                                         <ComboBox x:Name="CommandCategoryPicker" Grid.Column="1" Header="Category" SelectedIndex="0" SelectionChanged="CommandCategoryPicker_SelectionChanged"><ComboBoxItem Content="All commands" Tag="all" /><ComboBoxItem Content="Favorites" Tag="favorites" /><ComboBoxItem Content="Read and inspect" Tag="read" /><ComboBoxItem Content="Scripts" Tag="scripts" /><ComboBoxItem Content="Instances" Tag="instances" /><ComboBoxItem Content="Runtime" Tag="runtime" /></ComboBox>
                                     </Grid>
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
-                                        <ComboBox x:Name="CommandPicker" Header="Command" PlaceholderText="Select a command" IsTextSearchEnabled="True" SelectionChanged="CommandPicker_SelectionChanged" />
+                                        <ComboBox x:Name="CommandPicker" Header="Studio operation" PlaceholderText="Select a command" IsTextSearchEnabled="True" SelectionChanged="CommandPicker_SelectionChanged" />
                                         <Button x:Name="FavoriteCommandButton" Grid.Column="1" VerticalAlignment="Bottom" Click="FavoriteCommandButton_Click" IsEnabled="False" Content="☆ Favorite" />
                                         <Button Grid.Column="2" VerticalAlignment="Bottom" Click="DiscoverCommandsButton_Click"><StackPanel Orientation="Horizontal" Spacing="7"><SymbolIcon Symbol="Refresh" /><TextBlock Text="Discover" /></StackPanel></Button>
                                     </Grid>
-                                    <TextBlock x:Name="CommandSchemaText" Text="Select a command to inspect its schema." FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxHeight="150" />
-                                    <Expander Header="Structured arguments" IsExpanded="True"><StackPanel x:Name="StructuredArgumentsPanel" Spacing="10" Padding="0,8,0,4"><TextBlock Text="Select a command to generate argument controls." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Expander>
-                                    <TextBox x:Name="CommandArgumentsTextBox" Header="Arguments (JSON object)" Text="{}" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                    <Border Padding="13" CornerRadius="12" Background="{ThemeResource BrandAccentSoftBrush}">
+                                        <Grid ColumnSpacing="12"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><StackPanel Spacing="3"><TextBlock x:Name="CommandFriendlyNameText" Text="Choose an operation" FontSize="17" FontWeight="SemiBold" /><TextBlock x:Name="CommandDescriptionText" Text="A plain-language explanation will appear here." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" /></StackPanel><Border Grid.Column="1" Padding="10,5" CornerRadius="10" Background="{ThemeResource BrandWarmSoftBrush}" VerticalAlignment="Center"><TextBlock x:Name="CommandRiskText" Text="Risk --" Foreground="{ThemeResource BrandWarmBrush}" FontWeight="SemiBold" /></Border></Grid>
+                                    </Border>
+                                    <StackPanel Spacing="8">
+                                        <TextBlock Text="Details" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock Text="Required fields are marked with an asterisk. Optional fields can be left blank." Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" />
+                                        <StackPanel x:Name="StructuredArgumentsPanel" Spacing="12"><TextBlock Text="Select a command to generate its form." Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel>
+                                    </StackPanel>
                                     <Grid ColumnSpacing="10">
                                         <Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions>
                                         <ComboBox x:Name="CommandPresetPicker" Header="Saved preset" PlaceholderText="Choose a preset" SelectionChanged="CommandPresetPicker_SelectionChanged" />
@@ -379,24 +486,32 @@
                                         <Button Grid.Column="2" VerticalAlignment="Bottom" Click="DeleteCommandPresetButton_Click" Content="Delete" />
                                     </Grid>
                                     <StackPanel Orientation="Horizontal" Spacing="10">
-                                        <Button x:Name="RunCommandButton" Style="{ThemeResource AccentButtonStyle}" Click="RunCommandButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Play" /><TextBlock Text="Run command" /></StackPanel></Button>
-                                        <Button x:Name="QueueCommandButton" Click="QueueCommandButton_Click" IsEnabled="False" Content="Add to queue" />
+                                        <Button x:Name="QueueCommandButton" Style="{ThemeResource BrandPrimaryButtonStyle}" Click="QueueCommandButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Permissions" /><TextBlock Text="Add to Change Review" /></StackPanel></Button>
+                                        <Button x:Name="RunCommandButton" Click="RunCommandButton_Click" IsEnabled="False"><StackPanel Orientation="Horizontal" Spacing="8"><SymbolIcon Symbol="Play" /><TextBlock x:Name="RunCommandLabel" Text="Run inspection" /></StackPanel></Button>
                                         <ProgressRing x:Name="CommandProgress" Width="20" Height="20" IsActive="False" Visibility="Collapsed" />
                                     </StackPanel>
+                                    <Expander Header="Advanced JSON and schema" IsExpanded="False">
+                                        <StackPanel Spacing="12" Padding="0,8,0,4">
+                                            <TextBox x:Name="CommandArgumentsTextBox" Header="Arguments (JSON object)" Text="{}" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" TextChanged="CommandArgumentsTextBox_TextChanged" />
+                                            <Expander Header="Live command schema" IsExpanded="False"><TextBlock x:Name="CommandSchemaText" Text="Select a command to inspect its schema." FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxHeight="220" /></Expander>
+                                        </StackPanel>
+                                    </Expander>
                                 </StackPanel>
                             </Border>
-                            <Border Style="{ThemeResource SectionCardStyle}">
-                                <StackPanel Spacing="10">
-                                    <TextBlock Text="Result" FontSize="18" FontWeight="SemiBold" />
+                            <Expander Header="Latest result" IsExpanded="False">
+                                <Border Style="{ThemeResource SectionCardStyle}">
                                     <TextBox x:Name="CommandResultTextBox" Text="No command has run yet." IsReadOnly="True" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="220" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
-                                </StackPanel>
-                            </Border>
+                                </Border>
+                            </Expander>
                         </StackPanel>
                         <Border x:Name="ApprovalQueuePanel" Grid.Column="1" Style="{ThemeResource SectionCardStyle}" Margin="0,66,0,0">
                             <StackPanel Spacing="12">
                                 <Grid><StackPanel Spacing="2"><TextBlock Text="Approval queue" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Review commands before atomic or sequential execution" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" /></StackPanel><Button HorizontalAlignment="Right" VerticalAlignment="Center" Click="ClearApprovalQueueButton_Click" Content="Clear" /></Grid>
-                                <ListView x:Name="ApprovalQueueList" MinHeight="130" MaxHeight="200" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><Grid Padding="3,7"><Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Position}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><StackPanel Grid.Column="1"><TextBlock Text="{Binding Command}" FontWeight="SemiBold" /><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Grid></DataTemplate></ListView.ItemTemplate></ListView>
-                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button x:Name="ExecuteApprovalQueueButton" Style="{ThemeResource AccentButtonStyle}" Click="ExecuteApprovalQueueButton_Click" IsEnabled="False" Content="Review and execute queue" /><Button Grid.Column="1" Click="SaveWorkflowButton_Click" Content="Save workflow" /></Grid>
+                                <Border x:Name="ApprovalQueueEmptyState" Padding="20" CornerRadius="12" Background="{ThemeResource BrandAccentSoftBrush}">
+                                    <StackPanel HorizontalAlignment="Center" Spacing="6"><SymbolIcon Symbol="Permissions" Foreground="{ThemeResource BrandAccentBrush}" /><TextBlock Text="Nothing waiting for review" FontWeight="SemiBold" HorizontalAlignment="Center" /><TextBlock Text="Choose a task and add it to Change Review." Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextAlignment="Center" TextWrapping="Wrap" /></StackPanel>
+                                </Border>
+                                <ListView x:Name="ApprovalQueueList" Visibility="Collapsed" MinHeight="130" MaxHeight="200" SelectionMode="None"><ListView.ItemTemplate><DataTemplate><Grid Padding="3,7"><Grid.ColumnDefinitions><ColumnDefinition Width="36" /><ColumnDefinition Width="*" /></Grid.ColumnDefinitions><TextBlock Text="{Binding Position}" Foreground="{ThemeResource TextFillColorTertiaryBrush}" /><StackPanel Grid.Column="1"><TextBlock Text="{Binding Command}" FontWeight="SemiBold" /><TextBlock Text="{Binding Summary}" TextWrapping="Wrap" MaxLines="2" Foreground="{ThemeResource TextFillColorSecondaryBrush}" /></StackPanel></Grid></DataTemplate></ListView.ItemTemplate></ListView>
+                                <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><Button x:Name="ExecuteApprovalQueueButton" Style="{ThemeResource BrandPrimaryButtonStyle}" Click="OpenChangeReviewQueueButton_Click" IsEnabled="False" Content="Open Change Review" /><Button Grid.Column="1" Click="SaveWorkflowButton_Click" Content="Save workflow" /></Grid>
                                 <Grid ColumnSpacing="8"><Grid.ColumnDefinitions><ColumnDefinition Width="*" /><ColumnDefinition Width="Auto" /></Grid.ColumnDefinitions><ComboBox x:Name="WorkflowPicker" Header="Saved workflow" PlaceholderText="Choose workflow" /><Button Grid.Column="1" VerticalAlignment="Bottom" Click="LoadWorkflowButton_Click" Content="Load" /></Grid>
                                 <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
                                 <Grid><StackPanel Spacing="2"><TextBlock Text="Command history" FontSize="18" FontWeight="SemiBold" /><TextBlock Text="Persistent redacted outcomes" Foreground="{ThemeResource TextFillColorSecondaryBrush}" Style="{ThemeResource CaptionTextBlockStyle}" /></StackPanel><StackPanel HorizontalAlignment="Right" Orientation="Horizontal" Spacing="8"><ComboBox x:Name="HistoryRetentionPicker" Width="90" SelectedIndex="1" SelectionChanged="HistoryRetentionPicker_SelectionChanged"><ComboBoxItem Content="25" Tag="25" /><ComboBoxItem Content="100" Tag="100" /><ComboBoxItem Content="250" Tag="250" /></ComboBox><Button Click="ClearCommandHistoryButton_Click" Content="Clear" /></StackPanel></Grid>

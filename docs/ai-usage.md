@@ -13,6 +13,8 @@ needed.
 
 | Goal | Use |
 |---|---|
+| Connect generic MCP CLI agent | `node cli.js stdio` (or `.mcp.json`) |
+| Discover agent capabilities | `node cli.js discovery` |
 | Change a mapped Luau script | Edit locally, then `node cli.js push <file>` |
 | Pull the open place | `node cli.js pull <directory>` |
 | Inspect Studio | `node cli.js plugin inspect <path>` or `plugin call read_source` |

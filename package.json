@@ -23,6 +23,10 @@
     "rust:daemon": "cargo run --manifest-path rust/abraxius-rs/Cargo.toml --bin abraxius-daemon",
     "app:build": "npm run rust:build && dotnet build app/Abraxius.App/Abraxius.App.csproj -c Release -p:Platform=x64",
     "app:run": "dotnet run --project app/Abraxius.App/Abraxius.App.csproj -c Release -p:Platform=x64",
+    "linux:run": "electron app/Abraxius.Linux/main.js",
+    "linux:tauri:build": "cargo build --release --manifest-path app/Abraxius.Linux/src-tauri/Cargo.toml",
+    "linux:tauri:install": "sh app/Abraxius.Linux/install.sh",
+    "linux:install": "sh app/Abraxius.Linux/install.sh",
     "install-plugin": "node scripts/install-plugin.js",
     "plugin": "node scripts/install-plugin.js"
   },
@@ -40,10 +44,17 @@
   "author": "Velumix",
   "license": "MIT",
   "dependencies": {
+    "@xterm/addon-fit": "^0.11.0",
+    "@xterm/addon-search": "^0.16.0",
+    "@xterm/addon-web-links": "^0.12.0",
+    "@xterm/xterm": "^6.0.0",
+    "node-pty": "^1.1.0",
     "octokit": "^5.0.5",
     "ws": "^8.18.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^4.0.1",
+    "electron": "^37.2.6",
     "monaco-editor": "^0.55.1",
     "moonwave": "^1.4.2"
   }

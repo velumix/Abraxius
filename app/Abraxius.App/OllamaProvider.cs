@@ -52,5 +52,27 @@ internal sealed class OllamaProvider : IAiProvider, IDisposable
         }
     }
 
+    public async Task<string> CompleteStructuredAsync(string model, IReadOnlyList<AiMessage> messages, JsonElement schema, CancellationToken cancellationToken = default)
+    {
+        using var response = await _http.PostAsJsonAsync("api/chat", new
+        {
+            model,
+            messages = messages.Select(message => new { role = message.Role, content = message.Content }),
+            stream = false,
+            format = schema,
+            options = new { temperature = 0 }
+        }, cancellationToken);
+        response.EnsureSuccessStatusCode();
+        using var document = JsonDocument.Parse(await response.Content.ReadAsStringAsync(cancellationToken));
+        if (document.RootElement.TryGetProperty("error", out var error)) throw new InvalidOperationException(error.GetString());
+        if (document.RootElement.TryGetProperty("message", out var message)
+            && message.TryGetProperty("content", out var content)
+            && content.GetString() is string result)
+        {
+            return result;
+        }
+        throw new InvalidOperationException("Ollama returned no structured message content.");
+    }
+
     public void Dispose() => _http.Dispose();
 }

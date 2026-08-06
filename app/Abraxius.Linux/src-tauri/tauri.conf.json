@@ -1,0 +1,30 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Abraxius",
+  "version": "1.0.0",
+  "identifier": "com.velumix.abraxius",
+  "build": {
+    "frontendDist": "../renderer"
+  },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [
+      {
+        "title": "Abraxius",
+        "width": 1180,
+        "height": 780,
+        "minWidth": 820,
+        "minHeight": 580,
+        "resizable": true
+      }
+    ],
+    "security": { "csp": null }
+  },
+  "bundle": {
+    "active": true,
+    "targets": ["deb"],
+    "category": "Development",
+    "shortDescription": "Roblox Studio companion and script sync",
+    "longDescription": "Abraxius Roblox Studio companion and verified Luau script sync system"
+  }
+}

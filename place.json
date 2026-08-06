@@ -1,0 +1,31 @@
+{
+  "name": "RobloxPlace",
+  "format": "abraxius-v1",
+  "tree": {
+    "$className": "DataModel",
+    "Lighting": {
+      "$path": "src/Lighting"
+    },
+    "ReplicatedFirst": {
+      "$path": "src/ReplicatedFirst"
+    },
+    "ReplicatedStorage": {
+      "$path": "src/ReplicatedStorage"
+    },
+    "ServerScriptService": {
+      "$path": "src/ServerScriptService"
+    },
+    "ServerStorage": {
+      "$path": "src/ServerStorage"
+    },
+    "StarterGui": {
+      "$path": "src/StarterGui"
+    },
+    "StarterPlayer": {
+      "$path": "src/StarterPlayer"
+    },
+    "Workspace": {
+      "$path": "src/Workspace"
+    }
+  }
+}

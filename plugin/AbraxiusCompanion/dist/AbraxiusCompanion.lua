@@ -97,7 +97,7 @@ end
 
 local PLUGIN_URL = "http://localhost:13471"
 local ANALYTICS_URL = "http://localhost:13472"
-local PLUGIN_VERSION = "1.8.1"
+local PLUGIN_VERSION = "1.8.6"
 local POLL_INTERVAL = 0.5
 local EVENT_LIMIT = 64
 local CONTEXT_SNAPSHOT_INTERVAL = 10
@@ -519,13 +519,190 @@ local function tokenize(line: string): { string }
 end
 
 local function estimateTokens(text: string): number
-	return math.max(1, math.ceil(#text / 4))
+	return math.ceil(#text / 4)
 end
 
-local function bounded(text: string, budget: number): string
-	local maximum = budget * 4
-	if #text <= maximum then return text end
-	return string.sub(text, 1, math.max(0, maximum - 16)) .. "\n...TRUNCATED"
+local function packRecords(records: { string }, budget: number): any
+	local maximum = math.max(0, budget) * 4
+	local output = {}
+	local used = 0
+	for _, record in ipairs(records) do
+		local separator = if #output == 0 then 0 else 1
+		local required = separator + #record
+		if used + required <= maximum then
+			table.insert(output, record)
+			used += required
+		else
+			break
+		end
+	end
+	local content = table.concat(output, "\n")
+	return {
+		content = content,
+		shown = #output,
+		total = #records,
+		truncated = #output < #records,
+		tokens = estimateTokens(content),
+	}
+end
+
+local STOP_WORDS: { [string]: boolean } = {
+	about = true, after = true, again = true, also = true, ["and"] = true,
+	are = true, can = true, code = true, could = true, from = true,
+	have = true, into = true, just = true, need = true, roblox = true,
+	script = true, should = true, studio = true, that = true, the = true,
+	their = true, ["then"] = true, this = true, want = true, what = true,
+	when = true, where = true, with = true, would = true,
+}
+
+local function normalizeTerm(raw: string): string
+	if #raw > 4 and string.sub(raw, -1) == "s" and string.sub(raw, -2) ~= "ss" then
+		return string.sub(raw, 1, -2)
+	end
+	return raw
+end
+
+local function taskTerms(taskText: string): { string }
+	local terms = {}
+	local seen: { [string]: boolean } = {}
+	for raw in string.gmatch(string.lower(taskText), "[%w_]+") do
+		local term = normalizeTerm(raw)
+		if #term >= 3 and not STOP_WORDS[raw] and not seen[term] then
+			seen[term] = true
+			table.insert(terms, term)
+			if #terms >= 12 then break end
+		end
+	end
+	return terms
+end
+
+local function termCounts(text: string, wanted: { [string]: boolean }): { [string]: number }
+	local counts: { [string]: number } = {}
+	local separated = string.gsub(text, "(%l)(%u)", "%1 %2")
+	separated = string.gsub(separated, "_", " ")
+	for raw in string.gmatch(string.lower(separated), "[%w]+") do
+		local term = normalizeTerm(raw)
+		if wanted[term] and (counts[term] or 0) < 4 then
+			counts[term] = (counts[term] or 0) + 1
+		end
+	end
+	return counts
+end
+
+local function isVendoredPath(lowerPath: string): boolean
+	return string.find(lowerPath, ".dependencies.", 1, true) ~= nil
+		or string.find(lowerPath, ".packages.", 1, true) ~= nil
+		or string.find(lowerPath, "._index.", 1, true) ~= nil
+		or string.find(lowerPath, "._reactpackages.", 1, true) ~= nil
+		or string.find(lowerPath, ".node_modules.", 1, true) ~= nil
+end
+
+local function relevantScripts(taskText: string, budget: number): any
+	local terms = taskTerms(taskText)
+	if #terms == 0 then
+		local message = "No distinctive task terms were available."
+		return {
+			content = message,
+			shown = 0,
+			total = 0,
+			truncated = false,
+			tokens = estimateTokens(message),
+		}
+	end
+	local wanted: { [string]: boolean } = {}
+	for _, term in ipairs(terms) do wanted[term] = true end
+	local minimumScore = if #terms >= 3 then 20 else 1
+
+	local ranked = {}
+	for _, descendant in ipairs(game:GetDescendants()) do
+		if descendant:IsA("LuaSourceContainer") then
+			local path = string.gsub(descendant:GetFullName(), "^game%.", "")
+			local lowerPath = string.lower(path)
+			local source = descendant.Source
+			local pathCounts = termCounts(path, wanted)
+			local sourceCounts = termCounts(source, wanted)
+			local score = 0
+			local matchedTerms = {}
+			local pathCoverage = 0
+			for _, term in ipairs(terms) do
+				local matched = false
+				if pathCounts[term] then
+					score += 18
+					pathCoverage += 1
+					matched = true
+				end
+				if sourceCounts[term] then
+					score += sourceCounts[term]
+					matched = true
+				end
+				if matched then table.insert(matchedTerms, term) end
+			end
+			local coverage = #matchedTerms
+			if coverage > 0 then
+				score += coverage * 20
+				if coverage == 1 and #terms >= 3 then score -= 10 end
+				if isVendoredPath(lowerPath) then
+					if pathCoverage == 0 then score = -1 else score -= 60 end
+				end
+				if #source > 100000 then score -= 5 end
+			end
+			if score >= minimumScore then
+				table.insert(ranked, {
+					path = path,
+					source = source,
+					score = score,
+					coverage = coverage,
+					matchedTerms = matchedTerms,
+				})
+			end
+		end
+	end
+
+	table.sort(ranked, function(left, right)
+		if left.score == right.score then return left.path < right.path end
+		return left.score > right.score
+	end)
+
+	local records = {}
+	for _, item in ipairs(ranked) do
+		if #records >= 12 then break end
+		local record = { "SCRIPT " .. item.path
+			.. " score=" .. tostring(item.score)
+			.. " matched=" .. table.concat(item.matchedTerms, ",") }
+		local snippets = 0
+		for lineNumber, line in ipairs(string.split(item.source, "\n")) do
+			local matched = false
+			local lineCounts = termCounts(line, wanted)
+			for term in pairs(lineCounts) do
+				if wanted[term] then
+					matched = true
+					break
+				end
+			end
+			if matched then
+				local compact = trim(string.gsub(line, "%s+", " "))
+				if #compact > 220 then compact = string.sub(compact, 1, 217) .. "..." end
+				table.insert(record, tostring(lineNumber) .. ": " .. compact)
+				snippets += 1
+				if snippets >= 3 then break end
+			end
+		end
+		table.insert(records, table.concat(record, "\n"))
+	end
+	if #records == 0 then
+		local message = "No live scripts matched: " .. table.concat(terms, ", ")
+		return {
+			content = message,
+			shown = 0,
+			total = 0,
+			truncated = false,
+			tokens = estimateTokens(message),
+		}
+	end
+	local packed = packRecords(records, budget)
+	packed.total = #ranked
+	packed.truncated = packed.shown < packed.total
+	return packed
 end
 
 local function revision(hashSource: (string) -> string, source: string): number
@@ -596,7 +773,21 @@ function AXL.create(dependencies: any): any
 		local command = string.lower(table.remove(tokens, 1) or "")
 
 		if command == "hello" then
-			local requested = tokens[1] or VERSION
+			local requested = VERSION
+			local sawVersion = false
+			local sawProject = false
+			for _, token in ipairs(tokens) do
+				if string.match(token, "^axl/%d+$") and not sawVersion then
+					requested = token
+					sawVersion = true
+				elseif string.match(token, "^project=.+$") then
+					if sawProject then error("Duplicate option: project") end
+					sawProject = true
+					-- Project identity is a host hint in AXL/1; Studio does not resolve it yet.
+				else
+					error("Unknown hello argument: " .. token)
+				end
+			end
 			if requested ~= VERSION then return "ERR VERSION expected=" .. VERSION end
 			return "READY " .. VERSION .. " ns=0 tools=core,studio"
 		elseif command == "context" then
@@ -604,8 +795,28 @@ function AXL.create(dependencies: any): any
 			local taskText = tokens[1]
 			local budget = parseBudget(tokens, 2, 800)
 			local snapshot = dependencies.contextSnapshot()
-			local content = bounded(dependencies.jsonEncode(snapshot), budget)
-			return "CTX $0 t=" .. tostring(estimateTokens(content)) .. "\nTASK " .. taskText .. "\n" .. content
+			local headings = "RELEVANT LIVE SCRIPTS\n\nSTUDIO STATE\n"
+			local available = math.max(0, budget - estimateTokens(headings))
+			local stateJson = dependencies.jsonEncode(snapshot)
+			local reservedState = math.min(estimateTokens(stateJson), math.floor(available * 0.3))
+			local retrieval = relevantScripts(taskText, available - reservedState)
+			local stateBudget = math.max(0, available - retrieval.tokens)
+			local state = packRecords({ stateJson }, stateBudget)
+			if state.shown == 0 then
+				state = packRecords({
+					dependencies.jsonEncode({ truncated = true, bytes = #stateJson }),
+				}, stateBudget)
+				state.truncated = true
+			end
+			local content = "RELEVANT LIVE SCRIPTS\n"
+				.. retrieval.content
+				.. "\n\nSTUDIO STATE\n"
+				.. state.content
+			return "CTX $0 t=" .. tostring(estimateTokens(content))
+				.. " scripts=" .. tostring(retrieval.shown) .. "/" .. tostring(retrieval.total)
+				.. " truncated=" .. (if retrieval.truncated or state.truncated then "1" else "0")
+				.. " stateTokens=" .. tostring(state.tokens)
+				.. "\n" .. content
 		elseif command == "find" then
 			if #tokens < 1 then error('Usage: find "query" budget=N') end
 			local query = string.lower(tokens[1])
@@ -628,8 +839,13 @@ function AXL.create(dependencies: any): any
 				end
 				if #matches >= 100 then break end
 			end
-			local content = bounded(table.concat(matches, "\n"), budget)
-			return "OK FIND n=" .. tostring(#matches) .. " t=" .. tostring(estimateTokens(content)) .. "\n" .. content
+			local packed = packRecords(matches, budget)
+			return "OK FIND n=" .. tostring(#matches)
+				.. " shown=" .. tostring(packed.shown)
+				.. " truncated=" .. (if packed.truncated then "1" else "0")
+				.. " capped=" .. (if #matches >= 100 then "1" else "0")
+				.. " t=" .. tostring(packed.tokens)
+				.. "\n" .. packed.content
 		elseif command == "read" then
 			local target = table.remove(tokens, 1)
 			if not target then error("Usage: read target [summary|symbols|source|full|lines A..B]") end
@@ -710,7 +926,10 @@ function AXL.create(dependencies: any): any
 			local id = operationId()
 			return "OK %" .. tostring(id) .. " " .. target .. "@"
 				.. tostring(revision(dependencies.hashSource, nextSource))
-				.. " changed=" .. tostring(math.abs(#newText - #oldText))
+				.. " removedBytes=" .. tostring(#oldText)
+				.. " addedBytes=" .. tostring(#newText)
+				.. " removedLines=" .. tostring(#string.split(oldText, "\n"))
+				.. " addedLines=" .. tostring(#string.split(newText, "\n"))
 				.. (if pending then " pending=1" else " verified=1")
 		elseif command == "execute" then
 			local code = tokens[1]
@@ -2474,7 +2693,15 @@ local function handleCommand(cmd: any): any
 	if not ok then
 		return { id = cmd.id, error = tostring(result) }
 	end
-	return { id = cmd.id, result = result }
+	local response = { id = cmd.id, result = result }
+	local serializable, encodeError = pcall(HttpService.JSONEncode, HttpService, response)
+	if not serializable then
+		return {
+			id = cmd.id,
+			error = "Command result is not JSON serializable: " .. tostring(encodeError),
+		}
+	end
+	return response
 end
 
 -- Source watching -----------------------------------------------------------
@@ -2632,8 +2859,9 @@ end
 
 -- Selection listener ---------------------------------------------------------
 local selectionConn: RBXScriptConnection? = nil
+local selectionPollRunning = false
 local function startSelectionListener()
-	if selectionConn then return end
+	if selectionConn or selectionPollRunning then return end
 	selectionConn = Selection.SelectionChanged:Connect(function()
 		local selected = Selection:Get()
 		local paths = {}
@@ -2641,6 +2869,25 @@ local function startSelectionListener()
 			table.insert(paths, (string.gsub(inst:GetFullName(), "^game%.", "")))
 		end
 		queueEvent({ type = "selection_changed", paths = paths })
+	end)
+	selectionPollRunning = true
+	task.spawn(function()
+		local previous = ""
+		while selectionPollRunning do
+			local paths = {}
+			for _, inst in ipairs(Selection:Get()) do
+				table.insert(paths, string.gsub(inst:GetFullName(), "^game%.", ""))
+			end
+			local signature = table.concat(paths, "\n")
+			if signature ~= previous then
+				previous = signature
+				if ui.selectionText then
+					ui.selectionText.Text = if #paths == 0 then "Nothing selected" else table.concat(paths, ", ")
+				end
+				queueEvent({ type = "selection_changed", paths = paths })
+			end
+			task.wait(0.5)
+		end
 	end)
 end
 
@@ -2699,6 +2946,7 @@ local function stopSelectionListener()
 		selectionConn:Disconnect()
 		selectionConn = nil
 	end
+	selectionPollRunning = false
 end
 
 -- Main loop ------------------------------------------------------------------

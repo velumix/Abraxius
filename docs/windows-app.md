@@ -9,12 +9,24 @@ Abraxius.App is a packaged WinUI 3 supervisor for the Rust daemon. It follows
 the Windows light, dark, and high-contrast themes and uses the project `Logo`
 and `Tray` assets for its app and notification-area identities.
 
+## App guides
+
+| If you want to… | Read |
+|---|---|
+| Connect the app and perform a harmless first check | [First run](app-first-run.md) |
+| Understand every page in the navigation rail | [Workspace tour](app-workspaces.md) |
+| Preview, approve, apply, and roll back a change | [Change Review](app-change-review.md) |
+| Inspect Studio or prepare a manual operation | [Commands](app-commands.md) |
+| Configure Ollama, AXL retrieval, memory, and Research mode | [Local AI](app-ai.md) |
+| Fix connections, discovery, startup, or editor problems | [Troubleshooting](app-troubleshooting.md) |
+
 | Area | Purpose |
 |---|---|
 | Home | See whether the host, Studio, and companion are ready |
 | Activity | Follow the current playtest and recent runtime output |
 | Intelligence | Review persistent Studio signals, correlations, and suggestions |
 | Sync and Code | Pull, edit, preview, approve, and verify Luau changes |
+| Review | Inspect exact diffs, risk, and preflight results before applying changes |
 | Commands | Discover companion operations and manage the approval queue |
 | AI | Chat with local models using only the context you choose |
 | Diagnostics | Inspect categorized logs and create a redacted support bundle |
@@ -93,9 +105,28 @@ immediate read-back because Draft Mode may expose only committed source.
   `multi_edit` command, renders structured and raw JSON inputs, and runs guarded
   manual operations. Direct mutations require confirmation. Commands can be
   saved as presets, placed in an approval queue, and stored as workflows.
+  Common-task shortcuts and plain-language summaries lead the page; raw JSON
+  and schemas stay collapsed until requested. Mutations cannot use the direct
+  Run action and must be added to Change Review.
+- **Review** combines dirty Code buffers and queued commands in one approval
+  surface. Editor items run a read-only Studio dry run with the pulled source
+  hash before Apply is enabled. Each item shows its exact diff or arguments,
+  deterministic risk level, intended operation, and validation receipt.
+  Applying still requires confirmation; a verified source apply keeps the
+  immediately previous source and applied hash for one conflict-checked
+  rollback. Dismissing a review does not discard the editor buffer or command.
 - **AI** connects to Ollama on `127.0.0.1:11434`, discovers available models,
-  streams chat with cancellation, and sends only the Studio, editor, and
-  runtime context sections explicitly enabled in the sidebar. The initial AI
+  streams chat with cancellation, and retrieves task-relevant live script
+  evidence through a bounded AXL `context` call for each request. The AXL token
+  budget is visible and adjustable; the larger generic Studio snapshot is
+  opt-in. Unsaved editor source and recent runtime errors can be included
+  separately. Conversation history is trimmed to the selected model's context
+  window instead of resending every stored message. Optional **Research mode**
+  gives the model up to two planning rounds and six validated read-only AXL
+  calls (`find`, `symbols`, bounded `lines`, and `state`) with a 2,000-token
+  evidence ceiling. The UI shows a receipt for calls, rounds, and estimated
+  evidence tokens. Patch, execute, full-source reads, and every other mutation
+  are unavailable to the research planner. The initial AI
   workspace is read-only and exposes no shell, filesystem, or Studio mutation
   tools. Local models are filtered and preferred by default; cloud-backed
   Ollama entries are clearly labeled and require disabling **Local models

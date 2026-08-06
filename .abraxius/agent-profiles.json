@@ -1,0 +1,42 @@
+{
+  "profiles": {
+    "abraxius-developer": {
+      "description": "Repository development agent for Abraxius itself.",
+      "cwd": ".",
+      "capabilities": [
+        "filesystem.read",
+        "filesystem.write",
+        "directory.list",
+        "shell.execute",
+        "git.status",
+        "git.diff",
+        "git.commit",
+        "mcp"
+      ],
+      "mcp": {
+        "command": "node",
+        "args": ["cli.js", "stdio"]
+      },
+      "launch": "cd <repo-root> && antigravity"
+    },
+    "roblox-studio": {
+      "description": "Studio agent for Roblox DataModel and approved Studio operations.",
+      "cwd": ".",
+      "capabilities": [
+        "roblox.datamodel.read",
+        "roblox.scripts",
+        "roblox.instances",
+        "roblox.studio.tests",
+        "roblox.creator-store"
+      ],
+      "mcp": {
+        "command": "node",
+        "args": ["cli.js", "stdio"]
+      },
+      "filesystem": "mapped-projects-only",
+      "shell": false,
+      "git": false
+    }
+  },
+  "defaultProfile": "abraxius-developer"
+}

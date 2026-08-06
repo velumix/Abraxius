@@ -10,7 +10,7 @@ sync system. Its packaged WinUI 3 app keeps a Rust daemon active in the taskbar
 and notification area while thin local CLIs ask the app-owned host to inspect
 Studio, pull projects, push existing script edits, and build AI context.
 
-Current tested release: **Abraxius App 1.14.5**, **Studio companion 1.8.1**,
+Current tested release: **Abraxius App 1.15.2**, **Studio companion 1.8.6**,
 and **companion protocol 6**.
 
 ## Documentation
@@ -163,6 +163,12 @@ AXL/1 grammar.
 The app's **Commands** page discovers the live companion schema. Commands can
 be reviewed, queued, saved as workflows, or drafted by the configured AI
 provider. Mutations always require approval.
+
+The **Change Review** page unifies dirty Code buffers and queued commands. It
+shows the exact dry-run diff or arguments, assigns a deterministic risk level,
+reports preflight results, and requires confirmation before applying one
+selected change. Verified source changes retain a conflict-checked one-click
+rollback snapshot.
 
 For an explicitly requested manual replacement, Command Center exposes compact
 `multi_edit` JSON:

@@ -1,0 +1,18 @@
+{
+  "manifest_version": 3,
+  "name": "Abraxius Context Bridge",
+  "version": "0.1.1",
+  "description": "Give a browser chatbot selected page context and a safe Abraxius tool bridge.",
+  "permissions": ["activeTab", "alarms", "contextMenus", "sidePanel", "scripting", "storage", "tabs"],
+  "host_permissions": ["http://127.0.0.1:13470/*", "http://localhost:13470/*", "http://127.0.0.1:13473/*", "http://localhost:13473/*", "https://chatgpt.com/*", "https://chat.openai.com/*"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_title": "Open Abraxius" },
+  "side_panel": { "default_path": "sidepanel.html" },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
