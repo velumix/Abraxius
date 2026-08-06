@@ -669,7 +669,7 @@ function createWindow() {
     minHeight: 580,
     show: false,
     title: "Abraxius",
-    icon: path.join(ROOT, "images/Logo.png"),
+    icon: path.join(ROOT, "images/AbraxiusLogo.png"),
     backgroundColor: "#101418",
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
@@ -695,7 +695,7 @@ function createWindow() {
 }
 
 function createTray() {
-  const image = nativeImage.createFromPath(path.join(ROOT, "images/Tray.png")).resize({ width: 20, height: 20 });
+  const image = nativeImage.createFromPath(path.join(ROOT, "images/AbraxiusLogo.png")).resize({ width: 20, height: 20 });
   tray = new Tray(image);
   tray.setToolTip("Abraxius");
   tray.setContextMenu(Menu.buildFromTemplate([
@@ -1282,7 +1282,7 @@ if (ipcMain && typeof ipcMain.handle === "function") {
   ipcMain.handle("autostart", (_event, enabled) => {
     if (enabled) {
       fs.mkdirSync(path.dirname(AUTOSTART), { recursive: true });
-      fs.writeFileSync(AUTOSTART, `[Desktop Entry]\nType=Application\nName=Abraxius\nTryExec=${process.execPath}\nExec="${process.execPath}" "${path.join(ROOT, "app/Abraxius.Linux/main.js")}"\nPath=${ROOT}\nIcon=${path.join(ROOT, "images/Logo.png")}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n`);
+      fs.writeFileSync(AUTOSTART, `[Desktop Entry]\nType=Application\nName=Abraxius\nTryExec=${process.execPath}\nExec="${process.execPath}" "${path.join(ROOT, "app/Abraxius.Linux/main.js")}"\nPath=${ROOT}\nIcon=${path.join(ROOT, "images/AbraxiusLogo.png")}\nTerminal=false\nX-GNOME-Autostart-enabled=true\n`);
     } else if (fs.existsSync(AUTOSTART)) {
       fs.unlinkSync(AUTOSTART);
     }
