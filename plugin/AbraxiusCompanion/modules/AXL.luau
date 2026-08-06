@@ -53,13 +53,31 @@ local function tokenize(line: string): { string }
 end
 
 local function estimateTokens(text: string): number
-	return math.max(1, math.ceil(#text / 4))
+	return math.ceil(#text / 4)
 end
 
-local function bounded(text: string, budget: number): string
-	local maximum = budget * 4
-	if #text <= maximum then return text end
-	return string.sub(text, 1, math.max(0, maximum - 16)) .. "\n...TRUNCATED"
+local function packRecords(records: { string }, budget: number): any
+	local maximum = math.max(0, budget) * 4
+	local output = {}
+	local used = 0
+	for _, record in ipairs(records) do
+		local separator = if #output == 0 then 0 else 1
+		local required = separator + #record
+		if used + required <= maximum then
+			table.insert(output, record)
+			used += required
+		else
+			break
+		end
+	end
+	local content = table.concat(output, "\n")
+	return {
+		content = content,
+		shown = #output,
+		total = #records,
+		truncated = #output < #records,
+		tokens = estimateTokens(content),
+	}
 end
 
 local STOP_WORDS: { [string]: boolean } = {
@@ -113,9 +131,18 @@ local function isVendoredPath(lowerPath: string): boolean
 		or string.find(lowerPath, ".node_modules.", 1, true) ~= nil
 end
 
-local function relevantScripts(taskText: string, budget: number): string
+local function relevantScripts(taskText: string, budget: number): any
 	local terms = taskTerms(taskText)
-	if #terms == 0 then return "No distinctive task terms were available." end
+	if #terms == 0 then
+		local message = "No distinctive task terms were available."
+		return {
+			content = message,
+			shown = 0,
+			total = 0,
+			truncated = false,
+			tokens = estimateTokens(message),
+		}
+	end
 	local wanted: { [string]: boolean } = {}
 	for _, term in ipairs(terms) do wanted[term] = true end
 	local minimumScore = if #terms >= 3 then 20 else 1
@@ -170,14 +197,12 @@ local function relevantScripts(taskText: string, budget: number): string
 		return left.score > right.score
 	end)
 
-	local output = {}
-	local includedScripts = 0
+	local records = {}
 	for _, item in ipairs(ranked) do
-		if includedScripts >= 12 then break end
-		includedScripts += 1
-		table.insert(output, "SCRIPT " .. item.path
+		if #records >= 12 then break end
+		local record = { "SCRIPT " .. item.path
 			.. " score=" .. tostring(item.score)
-			.. " matched=" .. table.concat(item.matchedTerms, ","))
+			.. " matched=" .. table.concat(item.matchedTerms, ",") }
 		local snippets = 0
 		for lineNumber, line in ipairs(string.split(item.source, "\n")) do
 			local matched = false
@@ -191,14 +216,27 @@ local function relevantScripts(taskText: string, budget: number): string
 			if matched then
 				local compact = trim(string.gsub(line, "%s+", " "))
 				if #compact > 220 then compact = string.sub(compact, 1, 217) .. "..." end
-				table.insert(output, tostring(lineNumber) .. ": " .. compact)
+				table.insert(record, tostring(lineNumber) .. ": " .. compact)
 				snippets += 1
 				if snippets >= 3 then break end
 			end
 		end
+		table.insert(records, table.concat(record, "\n"))
 	end
-	if #output == 0 then return "No live scripts matched: " .. table.concat(terms, ", ") end
-	return bounded(table.concat(output, "\n"), budget)
+	if #records == 0 then
+		local message = "No live scripts matched: " .. table.concat(terms, ", ")
+		return {
+			content = message,
+			shown = 0,
+			total = 0,
+			truncated = false,
+			tokens = estimateTokens(message),
+		}
+	end
+	local packed = packRecords(records, budget)
+	packed.total = #ranked
+	packed.truncated = packed.shown < packed.total
+	return packed
 end
 
 local function revision(hashSource: (string) -> string, source: string): number
@@ -269,7 +307,21 @@ function AXL.create(dependencies: any): any
 		local command = string.lower(table.remove(tokens, 1) or "")
 
 		if command == "hello" then
-			local requested = tokens[1] or VERSION
+			local requested = VERSION
+			local sawVersion = false
+			local sawProject = false
+			for _, token in ipairs(tokens) do
+				if string.match(token, "^axl/%d+$") and not sawVersion then
+					requested = token
+					sawVersion = true
+				elseif string.match(token, "^project=.+$") then
+					if sawProject then error("Duplicate option: project") end
+					sawProject = true
+					-- Project identity is a host hint in AXL/1; Studio does not resolve it yet.
+				else
+					error("Unknown hello argument: " .. token)
+				end
+			end
 			if requested ~= VERSION then return "ERR VERSION expected=" .. VERSION end
 			return "READY " .. VERSION .. " ns=0 tools=core,studio"
 		elseif command == "context" then
@@ -277,14 +329,28 @@ function AXL.create(dependencies: any): any
 			local taskText = tokens[1]
 			local budget = parseBudget(tokens, 2, 800)
 			local snapshot = dependencies.contextSnapshot()
-			local retrievalBudget = math.max(64, math.floor(budget * 0.7))
-			local stateBudget = math.max(64, budget - retrievalBudget)
-			local content = bounded(
-				"RELEVANT LIVE SCRIPTS\n" .. relevantScripts(taskText, retrievalBudget)
-					.. "\n\nSTUDIO STATE\n" .. bounded(dependencies.jsonEncode(snapshot), stateBudget),
-				budget
-			)
-			return "CTX $0 t=" .. tostring(estimateTokens(content)) .. "\nTASK " .. taskText .. "\n" .. content
+			local headings = "RELEVANT LIVE SCRIPTS\n\nSTUDIO STATE\n"
+			local available = math.max(0, budget - estimateTokens(headings))
+			local stateJson = dependencies.jsonEncode(snapshot)
+			local reservedState = math.min(estimateTokens(stateJson), math.floor(available * 0.3))
+			local retrieval = relevantScripts(taskText, available - reservedState)
+			local stateBudget = math.max(0, available - retrieval.tokens)
+			local state = packRecords({ stateJson }, stateBudget)
+			if state.shown == 0 then
+				state = packRecords({
+					dependencies.jsonEncode({ truncated = true, bytes = #stateJson }),
+				}, stateBudget)
+				state.truncated = true
+			end
+			local content = "RELEVANT LIVE SCRIPTS\n"
+				.. retrieval.content
+				.. "\n\nSTUDIO STATE\n"
+				.. state.content
+			return "CTX $0 t=" .. tostring(estimateTokens(content))
+				.. " scripts=" .. tostring(retrieval.shown) .. "/" .. tostring(retrieval.total)
+				.. " truncated=" .. (if retrieval.truncated or state.truncated then "1" else "0")
+				.. " stateTokens=" .. tostring(state.tokens)
+				.. "\n" .. content
 		elseif command == "find" then
 			if #tokens < 1 then error('Usage: find "query" budget=N') end
 			local query = string.lower(tokens[1])
@@ -307,8 +373,13 @@ function AXL.create(dependencies: any): any
 				end
 				if #matches >= 100 then break end
 			end
-			local content = bounded(table.concat(matches, "\n"), budget)
-			return "OK FIND n=" .. tostring(#matches) .. " t=" .. tostring(estimateTokens(content)) .. "\n" .. content
+			local packed = packRecords(matches, budget)
+			return "OK FIND n=" .. tostring(#matches)
+				.. " shown=" .. tostring(packed.shown)
+				.. " truncated=" .. (if packed.truncated then "1" else "0")
+				.. " capped=" .. (if #matches >= 100 then "1" else "0")
+				.. " t=" .. tostring(packed.tokens)
+				.. "\n" .. packed.content
 		elseif command == "read" then
 			local target = table.remove(tokens, 1)
 			if not target then error("Usage: read target [summary|symbols|source|full|lines A..B]") end
@@ -389,7 +460,10 @@ function AXL.create(dependencies: any): any
 			local id = operationId()
 			return "OK %" .. tostring(id) .. " " .. target .. "@"
 				.. tostring(revision(dependencies.hashSource, nextSource))
-				.. " changed=" .. tostring(math.abs(#newText - #oldText))
+				.. " removedBytes=" .. tostring(#oldText)
+				.. " addedBytes=" .. tostring(#newText)
+				.. " removedLines=" .. tostring(#string.split(oldText, "\n"))
+				.. " addedLines=" .. tostring(#string.split(newText, "\n"))
 				.. (if pending then " pending=1" else " verified=1")
 		elseif command == "execute" then
 			local code = tokens[1]

@@ -492,7 +492,7 @@
                                     </StackPanel>
                                     <Expander Header="Advanced JSON and schema" IsExpanded="False">
                                         <StackPanel Spacing="12" Padding="0,8,0,4">
-                                            <TextBox x:Name="CommandArgumentsTextBox" Header="Arguments (JSON object)" Text="{}" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+                                            <TextBox x:Name="CommandArgumentsTextBox" Header="Arguments (JSON object)" Text="{}" AcceptsReturn="True" FontFamily="Consolas" TextWrapping="NoWrap" MinHeight="150" ScrollViewer.VerticalScrollBarVisibility="Auto" ScrollViewer.HorizontalScrollBarVisibility="Auto" TextChanged="CommandArgumentsTextBox_TextChanged" />
                                             <Expander Header="Live command schema" IsExpanded="False"><TextBlock x:Name="CommandSchemaText" Text="Select a command to inspect its schema." FontFamily="Consolas" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" MaxHeight="220" /></Expander>
                                         </StackPanel>
                                     </Expander>

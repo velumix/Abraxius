@@ -13,9 +13,9 @@
     <EnableMsixTooling>true</EnableMsixTooling>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
-    <Version>1.15.1</Version>
-    <AssemblyVersion>1.15.1.0</AssemblyVersion>
-    <FileVersion>1.15.1.0</FileVersion>
+    <Version>1.15.2</Version>
+    <AssemblyVersion>1.15.2.0</AssemblyVersion>
+    <FileVersion>1.15.2.0</FileVersion>
     <PublishReadyToRun>false</PublishReadyToRun>
     <PublishTrimmed>false</PublishTrimmed>
   </PropertyGroup>

@@ -1,0 +1,17 @@
+{
+  "enabled": true,
+  "autoReview": false,
+  "maxRecalledMemories": 10,
+  "characterBudget": 4000,
+  "embeddingProvider": "ollama",
+  "ollamaHost": "http://127.0.0.1:11434",
+  "ollamaModel": "nomic-embed-text",
+  "mcpEnabled": true,
+  "mcpPort": 8765,
+  "mcpHost": "127.0.0.1",
+  "allowLan": false,
+  "mcpAuthToken": "a9b9390415b33b8d431065b5a7eee420",
+  "cloudPolicy": "never_cloud",
+  "sessionRetentionMs": 86400000,
+  "approvedDirectories": []
+}

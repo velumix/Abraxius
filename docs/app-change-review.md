@@ -54,6 +54,12 @@ Risk is a deterministic warning aid, not a proof of safety.
 High-risk operations are not blocked, but their target and payload should
 receive extra scrutiny.
 
+For queued `axl` commands, Change Review inspects the inner AXL verb. `context`,
+`find`, `read`, `state`, and `hello` are read-only and labeled low risk.
+`patch`, `execute`, reserved mutation verbs, empty payloads, and unknown verbs
+are labeled high risk. The outer `axl` wrapper never hides the operation's
+actual risk.
+
 ## Roll back the last source apply
 
 After a verified editor apply, **Rollback last source apply** becomes available.

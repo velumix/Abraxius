@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "abraxius": {
+      "command": "node",
+      "args": ["cli.js", "stdio"]
+    }
+  }
+}

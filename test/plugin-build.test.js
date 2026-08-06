@@ -35,6 +35,13 @@ test("plugin bundle preserves command registrations and safety contracts", () =>
   assert.ok(source.includes("if #terms >= 3 then 20 else 1"));
   assert.ok(source.includes("coverage * 20"));
   assert.ok(source.includes('matched=" .. table.concat(item.matchedTerms'));
+  assert.ok(source.includes("local function packRecords"));
+  assert.ok(source.includes('" shown=" .. tostring(packed.shown)'));
+  assert.ok(source.includes('" truncated=" .. (if packed.truncated then "1" else "0")'));
+  assert.ok(source.includes('" capped=" .. (if #matches >= 100 then "1" else "0")'));
+  assert.ok(source.includes('" removedBytes=" .. tostring(#oldText)'));
+  assert.ok(source.includes('" addedBytes=" .. tostring(#newText)'));
+  assert.ok(!source.includes('" changed=" .. tostring(math.abs(#newText - #oldText))'));
 });
 
 test("plugin output uses the clean Abraxius logging grammar", () => {

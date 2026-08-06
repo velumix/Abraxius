@@ -10,7 +10,7 @@ sync system. Its packaged WinUI 3 app keeps a Rust daemon active in the taskbar
 and notification area while thin local CLIs ask the app-owned host to inspect
 Studio, pull projects, push existing script edits, and build AI context.
 
-Current tested release: **Abraxius App 1.15.1**, **Studio companion 1.8.5**,
+Current tested release: **Abraxius App 1.15.2**, **Studio companion 1.8.6**,
 and **companion protocol 6**.
 
 ## Documentation

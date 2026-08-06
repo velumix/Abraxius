@@ -87,16 +87,23 @@ READY axl/1 ns=0 tools=core,studio
 context "round can end twice" budget=700
 ```
 
-The budget is an approximate output-token ceiling, from 64 to 32,000. Abraxius
-uses the task text to rank live scripts by path and source matches, includes up
-to three compact matching lines per relevant script, and then appends a bounded
-Studio-state snapshot. Relevant script evidence is placed first so a tight
-budget does not spend its best tokens on generic state:
+The budget is an approximate content-token ceiling, from 64 to 32,000.
+Abraxius uses the task text to rank live scripts by path and source matches,
+includes up to three compact matching lines per relevant script, and then
+appends a Studio-state snapshot. It packs whole script records instead of
+cutting the response in the middle of a path, snippet, or JSON record. Any
+state allocation that is not needed is automatically available to retrieval.
+Relevant script evidence is placed first so a tight budget does not spend its
+best tokens on generic state:
 
 ```text
-CTX $18422112 t=694
+CTX $0 t=694 scripts=5/8 truncated=1 stateTokens=118
 ...
 ```
+
+The receipt reports included and eligible script counts, whether either
+retrieval or state was truncated, and the state snapshot's estimated token
+cost. The short response header itself is not charged to the content budget.
 
 The retrieval is deterministic and read-only. It does not ask the model to
 guess which full scripts should be loaded, and it does not mutate Studio.
@@ -107,8 +114,17 @@ guess which full scripts should be loaded, and it does not mutate Studio.
 find "EndRound" budget=500
 ```
 
-The companion scans live `LuaSourceContainer` instances in Studio and bounds
-the returned paths and line numbers to the requested budget.
+The companion scans live `LuaSourceContainer` instances in Studio and packs
+complete path-and-line records into the requested budget:
+
+```text
+OK FIND n=14 shown=9 truncated=1 capped=0 t=87
+```
+
+`n` is the number found within the 100-match scan cap. `shown` is the number
+that fit in the response. `capped=1` means the scan reached that cap and more
+matches may exist. A record that does not fit ends packing rather than being
+partially emitted.
 
 ### Read
 
@@ -148,8 +164,11 @@ revision. The old text must occur exactly once. The plugin applies the change
 with `ScriptEditorService` and owns the ChangeHistory recording:
 
 ```text
-OK %91 game.ServerScriptService.MatchManager@133704925 changed=0 pending=1
+OK %91 game.ServerScriptService.MatchManager@133704925 removedBytes=16 addedBytes=16 removedLines=1 addedLines=1 pending=1
 ```
+
+The byte and line counts describe both sides of the replacement. Equal-length
+edits therefore no longer look like zero changes.
 
 `pending=1` means `ScriptEditorService` accepted the edit while Studio Draft
 Mode still exposes the previous committed `Instance.Source`. Do not retry it.
@@ -221,6 +240,12 @@ The host-side JSON AST remains available through `--ast` for debugging and
 early validation. Production execution always sends the original AXL text to
 the plugin. This keeps Studio as the single authority for paths, source,
 revisions, edits, runtime state, and undo history.
+
+Shared conformance fixtures in `test/fixtures/axl-conformance.json` pin the
+AXL/1 verbs, accepted examples, and host-side error classes. The Studio parser
+is also checked against that verb contract during the plugin build tests.
+Reserved syntax may parse on the host while production deliberately rejects it
+with `ERR NONAMESPACE` or `ERR UNSUPPORTED`.
 
 The host still owns what Roblox cannot: model interaction, local project files,
 transport, authentication, and durable sync/pending records for the normal

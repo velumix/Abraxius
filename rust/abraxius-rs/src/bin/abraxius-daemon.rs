@@ -725,36 +725,86 @@ async fn api_pending_record(
 }
 
 async fn api_pending_verify(State(state): State<AppState>) -> impl IntoResponse {
-    let paths = state
-        .pending_pushes
-        .lock()
-        .await
-        .keys()
-        .cloned()
-        .collect::<Vec<_>>();
+    let is_connected = {
+        let plugin = state.plugin.lock().await;
+        plugin_connected(&plugin)
+    };
+    if !is_connected {
+        let pushes = state
+            .pending_pushes
+            .lock()
+            .await
+            .values()
+            .cloned()
+            .collect::<Vec<_>>();
+        return ok(json!({
+            "ok": false,
+            "reason": "companion_disconnected",
+            "error": "Cannot verify pending edits: Studio companion is disconnected. Open Roblox Studio with the Abraxius plugin enabled, then commit your draft in Studio before verifying.",
+            "connected": false,
+            "verified": [],
+            "pushes": pushes
+        }));
+    }
+    let paths = {
+        let pushes = state.pending_pushes.lock().await;
+        pushes.keys().cloned().collect::<Vec<_>>()
+    };
     let mut verified = Vec::new();
+    let mut disconnected = false;
     for path in paths {
         let result = plugin_command(&state, json!({ "type": "read_source", "path": path })).await;
-        let mut pushes = state.pending_pushes.lock().await;
-        if let Some(push) = pushes.get_mut(&path) {
-            match result {
-                Ok(value) => {
+        match result {
+            Ok(value) => {
+                let mut pushes = state.pending_pushes.lock().await;
+                if let Some(push) = pushes.get_mut(&path) {
                     let source = value.get("source").and_then(Value::as_str).unwrap_or("");
                     let matches = hash_source(source) == push.source_hash;
                     push.stale = if matches { Some(false) } else { None };
                     push.status = if matches { "live".into() } else { "pending".into() };
                     push.verified_at = Some(now_ms());
                     push.error = None;
-                }
-                Err(err) => {
-                    push.status = "error".into();
-                    push.error = Some(err);
+                    verified.push(json!(push));
                 }
             }
-            verified.push(json!(push));
+            Err(err) => {
+                if err.contains("disconnected") || err.contains("not connected") || err.contains("Socket closed") {
+                    disconnected = true;
+                    break;
+                }
+                let mut pushes = state.pending_pushes.lock().await;
+                if let Some(push) = pushes.get_mut(&path) {
+                    push.status = "error".into();
+                    push.error = Some(err);
+                    verified.push(json!(push));
+                }
+            }
         }
     }
-    Json(json!({ "verified": verified }))
+    let all_pushes = state
+        .pending_pushes
+        .lock()
+        .await
+        .values()
+        .cloned()
+        .collect::<Vec<_>>();
+    if disconnected {
+        ok(json!({
+            "ok": false,
+            "reason": "companion_disconnected",
+            "error": "Cannot verify pending edits: Studio companion disconnected during verification. Open Roblox Studio with the Abraxius plugin enabled, then commit your draft in Studio before verifying.",
+            "connected": false,
+            "verified": [],
+            "pushes": all_pushes
+        }))
+    } else {
+        ok(json!({
+            "ok": true,
+            "connected": true,
+            "verified": verified,
+            "pushes": all_pushes
+        }))
+    }
 }
 
 #[derive(Deserialize)]

@@ -69,3 +69,13 @@ test("Commands uses task-first progressive disclosure and routes queued work to 
   assert.match(source, /RunCommandButton\.IsEnabled = command is not null && !mutating/);
   assert.match(source, /CommandPicker\.SelectedItem = "get_selection"/);
 });
+
+test("Change Review classifies the inner AXL verb instead of trusting the wrapper", () => {
+  assert.match(source, /private static string\? AxlVerb\(JsonElement arguments\)/);
+  assert.match(source, /EstimateCommandRisk\(item\.Command, item\.Arguments\)/);
+  assert.match(xaml, /TextChanged="CommandArgumentsTextBox_TextChanged"/);
+  assert.match(source, /EstimateCommandRisk\(command, document\.RootElement\)/);
+  assert.match(source, /"hello" or "context" or "find" or "read" or "state" => "Low"/);
+  assert.match(source, /"patch" => "Apply one exact, revision-checked source replacement/);
+  assert.match(source, /_ => "High"/);
+});

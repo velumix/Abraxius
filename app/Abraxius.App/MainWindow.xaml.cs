@@ -1632,8 +1632,8 @@ public sealed partial class MainWindow : Window
         {
             var key = $"command:{item.Position}:{item.Command}:{item.Arguments.GetRawText()}";
             if (_dismissedReviewKeys.Contains(key)) continue;
-            _changeReviewItems.Add(new ChangeReviewRow(key, "Command", item.Command, CommandTarget(item), EstimateCommandRisk(item.Command),
-                DescribeCommand(item.Command), "Arguments parsed as a JSON object · explicit approval required.",
+            _changeReviewItems.Add(new ChangeReviewRow(key, "Command", item.Command, CommandTarget(item), EstimateCommandRisk(item.Command, item.Arguments),
+                DescribeCommand(item.Command, item.Arguments), "Arguments parsed as a JSON object · explicit approval required.",
                 item.Arguments.GetRawText(), null, item));
         }
 
@@ -1844,33 +1844,82 @@ public sealed partial class MainWindow : Window
         return "Low";
     }
 
-    private static string EstimateCommandRisk(string command) => command switch
+    private static string? AxlVerb(JsonElement arguments)
     {
-        "delete_instance" or "execute_luau" or "write_source" or "create_script" or "multi_edit" => "High",
-        "set_properties" or "clone_instance" or "rename_instance" or "reparent_instance" or "transform_instance" or "create_instance" or "batch" => "Medium",
-        _ => "Low"
-    };
+        if (arguments.ValueKind != JsonValueKind.Object
+            || !arguments.TryGetProperty("source", out var sourceValue)
+            || sourceValue.ValueKind != JsonValueKind.String)
+            return null;
+        var source = sourceValue.GetString()?.TrimStart();
+        if (string.IsNullOrEmpty(source)) return null;
+        var separator = source.IndexOfAny(new[] { ' ', '\t', '\r', '\n' });
+        return (separator < 0 ? source : source[..separator]).ToLowerInvariant();
+    }
+
+    private static string EstimateCommandRisk(string command, JsonElement? arguments = null)
+    {
+        if (command == "axl")
+        {
+            var verb = arguments.HasValue ? AxlVerb(arguments.Value) : null;
+            return verb switch
+            {
+                "hello" or "context" or "find" or "read" or "state" => "Low",
+                _ => "High"
+            };
+        }
+        return command switch
+        {
+            "delete_instance" or "execute_luau" or "write_source" or "create_script" or "multi_edit" => "High",
+            "set_properties" or "clone_instance" or "rename_instance" or "reparent_instance" or "transform_instance" or "create_instance" or "batch" => "Medium",
+            _ => "Low"
+        };
+    }
 
     private static string CommandTarget(ApprovalQueueRow item)
     {
+        if (item.Command == "axl")
+        {
+            var verb = AxlVerb(item.Arguments);
+            return verb is null ? "AXL command" : $"AXL {verb}";
+        }
         foreach (var name in new[] { "file_path", "path", "parent", "name" })
             if (item.Arguments.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String) return value.GetString() ?? item.Command;
         return "Studio command";
     }
 
-    private static string DescribeCommand(string command) => command switch
+    private static string DescribeCommand(string command, JsonElement? arguments = null)
     {
-        "multi_edit" => "Apply exact, ordered source replacements through Studio MCP.",
-        "write_source" => "Replace a script source through the Studio companion.",
-        "create_script" => "Create a Script, LocalScript, or ModuleScript. Provide a full path, or a parent and name.",
-        "read_source" => "Read a script without changing Studio.",
-        "get_selection" => "Show the instances currently selected in Studio.",
-        "get_properties" => "Read only the requested properties from an instance.",
-        "delete_instance" => "Delete the selected Studio instance with undo history.",
-        "execute_luau" => "Execute approved Luau in Studio Edit mode.",
-        "set_properties" => "Change one or more properties on a Studio instance.",
-        _ => $"Run the queued '{command}' Studio operation."
-    };
+        if (command == "axl")
+        {
+            var verb = arguments.HasValue ? AxlVerb(arguments.Value) : null;
+            return verb switch
+            {
+                "hello" => "Negotiate the compact AXL protocol without changing Studio.",
+                "context" => "Gather a token-budgeted live Studio snapshot and task-relevant script evidence.",
+                "find" => "Search live Studio scripts and return complete, budget-packed matches.",
+                "read" => "Read live script metadata or source without changing Studio.",
+                "state" => "Inspect live Studio or instance state without changing it.",
+                "patch" => "Apply one exact, revision-checked source replacement in Studio.",
+                "execute" => "Execute approved Luau in Studio Edit mode through AXL.",
+                "undo" => "Request AXL operation-owned undo. This protocol version rejects it safely.",
+                null => "Run an unclassified AXL payload. Treat it as high risk until its verb is known.",
+                _ => $"Run the unrecognized AXL verb '{verb}'. It is treated as high risk."
+            };
+        }
+        return command switch
+        {
+            "multi_edit" => "Apply exact, ordered source replacements through Studio MCP.",
+            "write_source" => "Replace a script source through the Studio companion.",
+            "create_script" => "Create a Script, LocalScript, or ModuleScript. Provide a full path, or a parent and name.",
+            "read_source" => "Read a script without changing Studio.",
+            "get_selection" => "Show the instances currently selected in Studio.",
+            "get_properties" => "Read only the requested properties from an instance.",
+            "delete_instance" => "Delete the selected Studio instance with undo history.",
+            "execute_luau" => "Execute approved Luau in Studio Edit mode.",
+            "set_properties" => "Change one or more properties on a Studio instance.",
+            _ => $"Run the queued '{command}' Studio operation."
+        };
+    }
 
     private async Task<JsonElement> CallPluginAsync(Dictionary<string, object?> command)
     {
@@ -2192,6 +2241,27 @@ public sealed partial class MainWindow : Window
             BuildStructuredArgumentControls(schema);
         }
         else StructuredArgumentsPanel.Children.Clear();
+    }
+
+    private void CommandArgumentsTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        var command = CommandPicker?.SelectedItem?.ToString();
+        if (command is null || CommandRiskText is null || CommandDescriptionText is null) return;
+        try
+        {
+            using var document = JsonDocument.Parse(CommandArgumentsTextBox.Text);
+            if (document.RootElement.ValueKind != JsonValueKind.Object) throw new JsonException();
+            CommandRiskText.Text = $"{EstimateCommandRisk(command, document.RootElement)} risk";
+            CommandDescriptionText.Text = DescribeCommand(command, document.RootElement);
+        }
+        catch (JsonException)
+        {
+            if (command == "axl")
+            {
+                CommandRiskText.Text = "High risk";
+                CommandDescriptionText.Text = "The AXL payload is not valid JSON yet, so its inner operation cannot be classified.";
+            }
+        }
     }
 
     private void CommandShortcutButton_Click(object sender, RoutedEventArgs e)

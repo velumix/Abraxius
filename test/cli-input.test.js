@@ -10,6 +10,7 @@ const {
   readJsonObjectArgument,
   readTextArgument,
 } = require("../lib/cli-input");
+const { parseOptions } = require("../cli");
 
 test("JSON files bypass shell escaping and preserve complex Studio payloads", async () => {
   const directory = fs.mkdtempSync(path.join(os.tmpdir(), "abraxius-input-"));
@@ -61,3 +62,18 @@ test("input parser rejects ambiguous sources and explains the PowerShell-safe pa
     /must be an object/,
   );
 });
+
+test("parseOptions validates boundary flags and rejects missing option values", () => {
+  const valid = parseOptions(["--project", "./my-project", "--tag", "tag1", "--tag", "tag2", "--path", "game.Workspace", "--json", "extra"]);
+  assert.equal(valid.projectDir, "./my-project");
+  assert.deepEqual(valid.tags, ["tag1", "tag2"]);
+  assert.equal(valid.path, "game.Workspace");
+  assert.equal(valid.json, true);
+  assert.deepEqual(valid._, ["extra"]);
+
+  assert.throws(() => parseOptions(["--project"]), /Missing value after --project/);
+  assert.throws(() => parseOptions(["--tag"]), /Missing value after --tag/);
+  assert.throws(() => parseOptions(["--path"]), /Missing value after --path/);
+  assert.throws(() => parseOptions(["--unknown-flag"]), /Unknown option: --unknown-flag/);
+});
+

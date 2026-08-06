@@ -1,0 +1,1 @@
+-- Disabled: paint UI moved to PaintController (StarterPlayerScripts/Controllers/PaintController).

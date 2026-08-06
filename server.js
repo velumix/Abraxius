@@ -8,6 +8,13 @@ const { MCPContext } = require("./lib/context");
 const { PendingPushes } = require("./lib/pending");
 const logger = require("./lib/logger");
 const { PluginServer } = require("./lib/plugin-server");
+const { MemoryOrchestrator } = require("./lib/memory");
+const { AiToolWebSocketServer } = require("./lib/ai-tool-ws-server");
+const {
+  OllamaClient,
+  loadOllamaSettings,
+  saveOllamaSettings,
+} = require("./lib/ollama");
 const {
   addMemory,
   buildAiContext,
@@ -18,12 +25,14 @@ const {
 
 const API_PORT = 13470;
 const PLUGIN_PORT = 13471;
+const AI_WS_PORT = 13473;
 const PID_FILE = path.join(os.tmpdir(), "abraxius.pid");
 const LOG_FILE = path.join(os.tmpdir(), "abraxius.log");
 
 const context = new MCPContext();
 const pendingPushes = new PendingPushes();
 const pluginServer = new PluginServer({ port: PLUGIN_PORT });
+const memoryOrchestrator = new MemoryOrchestrator();
 
 function sendJson(res, statusCode, obj) {
   res.writeHead(statusCode, { "Content-Type": "application/json" });
@@ -57,13 +66,13 @@ async function runWithStateCache(bridge, fn) {
   return state;
 }
 
-async function createServer(bridge) {
+async function createServer(bridge, port = API_PORT) {
   const server = http.createServer(async (req, res) => {
     try {
       const url = new URL(req.url, `http://localhost:${API_PORT}`);
       const route = `${req.method} ${url.pathname}`;
       if (
-        bridge.ready &&
+        bridge?.ready &&
         url.pathname !== "/health" &&
         url.pathname !== "/log" &&
         url.pathname !== "/context"
@@ -76,9 +85,9 @@ async function createServer(bridge) {
         case "GET /health":
           sendJson(res, 200, {
             running: true,
-            connected: bridge.ready,
-            studio: bridge.serverInfo?.serverInfo || null,
-            toolsLoaded: bridge.tools.length,
+            connected: Boolean(bridge?.ready),
+            studio: bridge?.serverInfo?.serverInfo || null,
+            toolsLoaded: bridge?.tools?.length || 0,
             pluginConnected: pluginServer.isConnected(),
             pluginEvents: pluginServer.events.length,
             uptime: process.uptime(),
@@ -217,6 +226,153 @@ async function createServer(bridge) {
             projectDir: projectDir || process.cwd(),
             memory: clearMemory(projectDir || undefined, body.id),
           });
+          break;
+        }
+
+        case "GET /ollama/status": {
+          const settings = loadOllamaSettings(path.join(os.homedir(), ".config/abraxius"));
+          const client = new OllamaClient({ endpoint: settings.endpoint });
+          try {
+            const models = await client.listModels();
+            sendJson(res, 200, { online: true, endpoint: settings.endpoint, models, count: models.length, settings });
+          } catch (err) {
+            sendJson(res, 200, { online: false, endpoint: settings.endpoint, models: [], count: 0, error: err.message, settings });
+          }
+          break;
+        }
+
+        case "GET /ollama/models": {
+          const endpointParam = url.searchParams.get("endpoint");
+          const settings = loadOllamaSettings(path.join(os.homedir(), ".config/abraxius"));
+          const client = new OllamaClient({ endpoint: endpointParam || settings.endpoint });
+          try {
+            const models = await client.listModels();
+            sendJson(res, 200, { models });
+          } catch (err) {
+            sendJson(res, 500, { error: err.message });
+          }
+          break;
+        }
+
+        case "GET /memory-core/health":
+          sendJson(res, 200, memoryOrchestrator.getHealthStatus());
+          break;
+
+        case "GET /memory-core/search": {
+          const q = url.searchParams.get("query") || "";
+          const projectId = url.searchParams.get("projectId") || context.projectDir;
+          const scope = url.searchParams.get("scope") || undefined;
+          const type = url.searchParams.get("type") || undefined;
+          const limit = Number(url.searchParams.get("limit") || 10);
+          const searchRes = await memoryOrchestrator.searchMemories({
+            query: q,
+            scopeContext: { projectId, scope },
+            type,
+            limit,
+          });
+          sendJson(res, 200, searchRes);
+          break;
+        }
+
+        case "GET /memory-core/records": {
+          const projectId = url.searchParams.get("projectId") || undefined;
+          const scope = url.searchParams.get("scope") || undefined;
+          const type = url.searchParams.get("type") || undefined;
+          const status = url.searchParams.get("status") || undefined;
+          const records = memoryOrchestrator.store.listRecords({
+            projectId,
+            scope,
+            type,
+            verificationStatus: status,
+          });
+          sendJson(res, 200, { records });
+          break;
+        }
+
+        case "POST /memory-core/records": {
+          const body = await readBody(req);
+          const record = memoryOrchestrator.store.addRecord({
+            ...body,
+            sourceType: body.sourceType || "user",
+          });
+          sendJson(res, 200, { ok: true, record });
+          break;
+        }
+
+        case "POST /memory-core/records/correct": {
+          const body = await readBody(req);
+          const result = memoryOrchestrator.extraction.correctProposed(
+            body.id,
+            body.newContent,
+            body.newSummary,
+            body.reason
+          );
+          sendJson(res, 200, { ok: true, ...result });
+          break;
+        }
+
+        case "POST /memory-core/records/forget": {
+          const body = await readBody(req);
+          const deleted = memoryOrchestrator.store.forgetRecord(body.id, {
+            confirm: body.confirm === true,
+          });
+          sendJson(res, 200, { ok: deleted, id: body.id });
+          break;
+        }
+
+        case "GET /memory-core/proposed": {
+          const projectId = url.searchParams.get("projectId") || undefined;
+          const proposed = memoryOrchestrator.extraction.getProposed(projectId);
+          sendJson(res, 200, { proposed });
+          break;
+        }
+
+        case "POST /memory-core/proposed/approve": {
+          const body = await readBody(req);
+          const record = memoryOrchestrator.extraction.approveProposed(body.id);
+          sendJson(res, 200, { ok: true, record });
+          break;
+        }
+
+        case "POST /memory-core/proposed/reject": {
+          const body = await readBody(req);
+          const deleted = memoryOrchestrator.extraction.rejectProposed(body.id, {
+            confirm: body.confirm === true,
+          });
+          sendJson(res, 200, { ok: deleted, id: body.id });
+          break;
+        }
+
+        case "GET /memory-core/project-brief": {
+          const projectId = url.searchParams.get("projectId") || context.projectDir;
+          const brief = memoryOrchestrator.getProjectBrief(projectId);
+          sendJson(res, 200, brief);
+          break;
+        }
+
+        case "GET /memory-core/settings":
+          sendJson(res, 200, memoryOrchestrator.settings);
+          break;
+
+        case "POST /memory-core/settings": {
+          const body = await readBody(req);
+          const updated = memoryOrchestrator.updateSettings(body);
+          sendJson(res, 200, { ok: true, settings: updated });
+          break;
+        }
+
+        case "POST /memory-core/index-dir": {
+          const body = await readBody(req);
+          if (!body.dirPath) {
+            sendJson(res, 400, { error: "Missing 'dirPath' field" });
+            break;
+          }
+          memoryOrchestrator.indexer.addApprovedDirectory(body.dirPath);
+          const result = await memoryOrchestrator.indexer.indexDirectory(body.dirPath);
+          memoryOrchestrator.saveSettings({
+            approvedDirectories: Array.from(memoryOrchestrator.indexer.approvedDirectories),
+          });
+          sendJson(res, 200, { ok: true, result });
           break;
         }
 
@@ -438,14 +594,21 @@ async function createServer(bridge) {
 
         case "POST /pending/verify": {
           const pushes = pendingPushes.list().filter((p) => p.status !== "committed");
+          if (!pluginServer.isConnected()) {
+            sendJson(res, 200, {
+              ok: false,
+              reason: "companion_disconnected",
+              error: "Cannot verify pending edits: Studio companion is disconnected. Open Roblox Studio with the Abraxius plugin enabled, then commit your draft in Studio before verifying.",
+              connected: false,
+              verified: [],
+              pushes: pendingPushes.list(),
+            });
+            break;
+          }
           const verified = [];
+          let disconnectedDuringVerify = false;
           for (const push of pushes) {
             try {
-              if (!pluginServer.isConnected()) {
-                pendingPushes.setError(push.path, "Studio plugin not connected");
-                verified.push(pendingPushes.get(push.path));
-                continue;
-              }
               const result = await pluginServer.callPlugin({
                 type: "read_source",
                 path: push.path,
@@ -453,10 +616,25 @@ async function createServer(bridge) {
               const source = result && result.source;
               verified.push(pendingPushes.verify(push.path, source));
             } catch (err) {
+              if (err.message?.includes("disconnected") || err.message?.includes("not connected") || err.message?.includes("Socket closed")) {
+                disconnectedDuringVerify = true;
+                break;
+              }
               verified.push(pendingPushes.setError(push.path, err.message));
             }
           }
-          sendJson(res, 200, { verified });
+          if (disconnectedDuringVerify) {
+            sendJson(res, 200, {
+              ok: false,
+              reason: "companion_disconnected",
+              error: "Cannot verify pending edits: Studio companion disconnected during verification. Open Roblox Studio with the Abraxius plugin enabled, then commit your draft in Studio before verifying.",
+              connected: false,
+              verified: [],
+              pushes: pendingPushes.list(),
+            });
+          } else {
+            sendJson(res, 200, { ok: true, connected: true, verified, pushes: pendingPushes.list() });
+          }
           break;
         }
 
@@ -520,8 +698,8 @@ async function createServer(bridge) {
   });
 
   return new Promise((resolve) => {
-    server.listen(API_PORT, () => {
-      logger.success(`MCP API server listening on http://localhost:${API_PORT}`);
+    server.listen(port, () => {
+      logger.success(`MCP API server listening on http://localhost:${port}`);
       resolve(server);
     });
   });
@@ -530,6 +708,12 @@ async function createServer(bridge) {
 async function runDaemon() {
   logger.startupBanner("matrix");
   const bridge = new RobloxMCPBridge();
+  const aiToolServer = new AiToolWebSocketServer({
+    port: AI_WS_PORT, bridge, context, pendingPushes, pluginServer, buildContext: buildAiContext,
+    // Keep the repository root plus one explicit user-approved vault. Do not
+    // expose the rest of Desktop to chatbot file tools.
+    allowedRoots: [process.cwd(), path.join(os.homedir(), "Desktop", "AbraxiusVault")],
+  });
 
   bridge.on("listening", () =>
     logger.info("Waiting for Roblox Studio on ws://localhost:13469/studio"),
@@ -550,6 +734,8 @@ async function runDaemon() {
     bridge.start(),
     createServer(bridge),
     pluginServer.start(),
+    memoryOrchestrator.start(),
+    aiToolServer.start(),
   ]);
 
   pluginServer.on("connect", async () => {
@@ -653,6 +839,7 @@ if (require.main === module) {
 module.exports = {
   API_PORT,
   PLUGIN_PORT,
+  AI_WS_PORT,
   PID_FILE,
   LOG_FILE,
   createServer,
@@ -660,4 +847,5 @@ module.exports = {
   context,
   pendingPushes,
   pluginServer,
+  memoryOrchestrator,
 };

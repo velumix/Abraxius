@@ -127,6 +127,7 @@ for every model or agent host.
 | Understand the desktop workspace | [Windows app](windows-app.md) |
 | Pull, edit, and push scripts safely | [Sync workflow](sync.md) |
 | Connect an AI coding agent | [AI workflow](ai-usage.md) |
+| Chat with local LLMs and Memory Core | [Ollama workspace](ollama.md) |
 | Read repository and Actions context | [GitHub context](github-context.md) |
 | Use compact live Studio commands | [AXL command language](axl.md) |
 | Integrate another local tool | [Local API reference](api.md) |

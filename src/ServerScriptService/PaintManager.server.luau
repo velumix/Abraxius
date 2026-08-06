@@ -1,0 +1,1 @@
+-- Disabled: paint logic moved to PaintService (ServerScriptService/Services/PaintService).

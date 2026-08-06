@@ -219,6 +219,38 @@ test("source edit generation coalesces adjacent hunks when repeated blocks exhau
   assert.equal(edits.some(edit => edit.old_string === oldSource), false);
 });
 
+test("source edit generation falls back to one anchored edit when repeated hunks overlap", () => {
+  const oldSource = "header\nC\nE\nD\nE\nD\nE\nD\nE\nfooter\n";
+  const newSource = "header\nB\nA\nC\nA\nE\nD\nB\nB\nfooter\n";
+
+  const edits = buildSourceEdits(oldSource, newSource);
+  let simulated = oldSource;
+  for (const edit of edits) {
+    assert.equal(simulated.split(edit.old_string).length - 1, 1);
+    simulated = simulated.replace(edit.old_string, edit.new_string);
+  }
+  assert.equal(simulated, newSource);
+  assert.equal(edits.length, 1);
+  assert.equal(edits[0].old_string === oldSource, false);
+});
+
+test("source edit generation treats dollar replacement tokens as literal Luau source", () => {
+  const oldSource = "header\nlocal label = \"old\"\nfooter\n";
+  const newSource = "header\nlocal label = \"$& $` $' $$\"\nfooter\n";
+
+  const edits = buildSourceEdits(oldSource, newSource);
+  let simulated = oldSource;
+  for (const edit of edits) {
+    const index = simulated.indexOf(edit.old_string);
+    assert.notEqual(index, -1);
+    simulated =
+      simulated.slice(0, index) +
+      edit.new_string +
+      simulated.slice(index + edit.old_string.length);
+  }
+  assert.equal(simulated, newSource);
+});
+
 test("source edit generation refuses an unanchored whole-script replacement", () => {
   assert.throws(() => buildSourceEdits("print('old')", "print('new')"), /No shared source context/);
 });
@@ -251,4 +283,27 @@ test("script push tracks normalized LF source for a local CRLF file", async (t) 
   assert.equal(result.result.verified, false);
   assert.equal(result.result.pending, true);
   assert.equal(studioSource, "local value = 2\nreturn value\n");
+});
+
+test("script push uses exact CRLF anchors for a CRLF Studio source", async (t) => {
+  const projectDir = temporaryProject();
+  t.after(() => fs.rmSync(projectDir, { recursive: true, force: true }));
+  const localFile = path.join(projectDir, "src/ServerScriptService/Main.server.luau");
+  fs.mkdirSync(path.dirname(localFile), { recursive: true });
+  fs.writeFileSync(localFile, "local value = 2\nreturn value\n");
+  let studioSource = "local value = 1\r\nreturn value\r\n";
+  const client = {
+    health: async () => ({ connected: true, pluginConnected: true }),
+    pluginCall: async () => ({ ok: true, source: studioSource }),
+    call: async (_name, request) => {
+      for (const edit of request.edits) {
+        assert.notEqual(studioSource.indexOf(edit.old_string), -1);
+        studioSource = studioSource.replace(edit.old_string, edit.new_string);
+      }
+      return { content: [{ text: "ok" }] };
+    },
+  };
+  const result = await new Pusher(client, { projectDir }).push(localFile);
+  assert.equal(result.result.pending, true);
+  assert.equal(studioSource, "local value = 2\r\nreturn value\r\n");
 });

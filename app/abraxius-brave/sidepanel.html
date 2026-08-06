@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Abraxius Context Bridge</title>
+  <style>
+    :root { color-scheme: dark; font: 13px system-ui, sans-serif; }
+    body { margin: 0; padding: 14px; background: #11131a; color: #e8ebf4; }
+    h1 { font-size: 16px; margin: 0 0 10px; }
+    button, textarea { width: 100%; box-sizing: border-box; border: 1px solid #353a4d; border-radius: 7px; background: #1a1e29; color: inherit; padding: 9px; }
+    button { cursor: pointer; background: #5967d9; border: 0; margin: 5px 0; }
+    button.secondary { background: #292e3d; }
+    textarea { resize: vertical; min-height: 100px; margin: 6px 0; }
+    pre { white-space: pre-wrap; max-height: 220px; overflow: auto; background: #0b0d12; padding: 8px; border-radius: 6px; }
+    .status { color: #aeb7d5; min-height: 18px; }
+    .approval { border: 1px solid #c18a3d; padding: 8px; border-radius: 6px; margin-top: 8px; }
+    .console { height: 180px; overflow: auto; background: #090b10; color: #9fe7b2; font: 11px ui-monospace, monospace; padding: 8px; border-radius: 6px; white-space: pre-wrap; }
+  </style>
+</head>
+<body>
+  <h1>Abraxius Context Bridge</h1>
+  <div id="status" class="status">Checking Abraxius…</div>
+  <button id="refresh">Refresh page + Studio context</button>
+  <button id="inject" class="secondary">Insert context into chatbot</button>
+  <button id="tool" class="secondary">Check latest reply for Abraxius tool request</button>
+  <label style="display:flex;gap:8px;align-items:center;margin:8px 0;color:#f0c674;">
+    <input id="yolo" type="checkbox" style="width:auto;">
+    <span><b>YOLO mode</b><br><small>Auto-approve mutating tools until disabled</small></span>
+  </label>
+  <pre id="context">No context loaded.</pre>
+  <textarea id="prompt" placeholder="Ask about this page, a script, or the connected Studio project…"></textarea>
+  <button id="send">Ask local model</button>
+  <div id="reply"></div>
+  <div id="approval"></div>
+  <h2 style="font-size:13px;margin:12px 0 5px">Bridge activity</h2>
+  <div id="console" class="console">Waiting for Abraxius activity…</div>
+  <script src="sidepanel.js"></script>
+</body>
+</html>
