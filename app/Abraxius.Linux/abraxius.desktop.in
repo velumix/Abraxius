@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Abraxius
+Comment=Roblox Studio companion and script sync
+TryExec=@BIN@
+Exec=@BIN@
+Path=@REPO@
+Icon=@REPO@/images/Logo.png
+Terminal=false
+Categories=Development;Game;
+StartupWMClass=Abraxius

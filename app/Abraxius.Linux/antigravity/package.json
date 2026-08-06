@@ -1,0 +1,24 @@
+{
+  "name": "@abraxius/antigravity-bridge",
+  "version": "0.1.0",
+  "description": "Persistent Antigravity CLI bridge for Abraxius",
+  "main": "src/index.js",
+  "bin": {
+    "abraxius-agy-bridge": "bin/agy-bridge.js"
+  },
+  "scripts": {
+    "start": "node bin/agy-bridge.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "abraxius",
+    "antigravity",
+    "agy",
+    "bridge",
+    "pty"
+  ],
+  "license": "MIT"
+}
